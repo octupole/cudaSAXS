@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(openSAXS LANGUAGES CXX CUDA)
+project(cudaSAXS LANGUAGES CXX CUDA)
 # Specify the CUDA and C++ standard
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
@@ -36,15 +36,15 @@ add_subdirectory(Cuda)
 add_subdirectory(System)
 
 # Specify the target executable
-add_executable(openSAXS openSAXS.cpp)
+add_executable(cudaSAXS cudaSAXS.cpp)
 
-target_include_directories(openSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Cuda ${PROJECT_SOURCE_DIR}/System ")
+target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Cuda ${PROJECT_SOURCE_DIR}/System ")
 
 # Enable C++ and CUDA compilation
-set_target_properties(openSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries
-target_link_libraries(openSAXS cudafft3d system ${CUDA_LIBRARIES} cufft Python3::Python pybind11::module)
+target_link_libraries(cudaSAXS cudafft3d system ${CUDA_LIBRARIES} cufft Python3::Python pybind11::module)
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages
