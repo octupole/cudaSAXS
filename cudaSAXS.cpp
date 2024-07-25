@@ -1,9 +1,8 @@
-#include "Python3.h"
+#include "RunSaxs.h"
 #include <iostream>
 #include <vector>
 #include <cstdlib> // for std::getenv
 #include <CLI/CLI.hpp>
-#include <map>
 
 int main(int argc, char *argv[])
 {
@@ -30,8 +29,8 @@ int main(int argc, char *argv[])
     }
 
     // Get the input string from the command-line arguments
-    Python3 run_script(tpr_file, xtc_file);
-    run_script.get_atoms(100);
+    RunSaxs saxs(tpr_file, xtc_file);
+    saxs.Run(100, 200, 10);
     // run_python_script_with_args(tpr_file, xtc_file);
 
     // Print the result from the Python script
