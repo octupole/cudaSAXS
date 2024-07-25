@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
+#list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
 project(cudaSAXS LANGUAGES CXX CUDA)
 # Specify the CUDA and C++ standard
 set(CMAKE_CXX_STANDARD 14)
