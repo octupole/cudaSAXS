@@ -1,0 +1,59 @@
+/Makefile
+/Makefile.in
+/build/
+/__pycache__/
+*.l[ao]
+*~
+
+/config.guess
+/config.status
+/config.sub
+/configure
+/libtool
+/ltmain.sh
+/missing
+/config_old.log
+/src/.deps
+*.Po
+*.o
+*.a
+*.la
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+*.pyc
+*.*.pyc
+/src/build
+build-seq/CMakeFiles/CMakeDirectoryInformation.cmake
+python/openTRJ.egg-info/requires.txt
+.pydevproject
+.settings/org.eclipse.cdt.core.prefs
+.settings/org.eclipse.core.resources.prefs
+/.vscode/settings.json
+/Release/
+.venv
+.vscode
+/data/
+/build/
+/src/build/
+
