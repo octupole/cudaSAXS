@@ -5,6 +5,7 @@ import networkx as nx
 import sys
 import numpy as np
 from MDAnalysis.coordinates.PDB import PDBWriter
+import time
 
 class PDBWriterWithTitle(PDBWriter):
     def __init__(self, filename, n_atoms, title=""):
@@ -141,21 +142,27 @@ class TrajectoryStructures:
         # Apply periodic boundary conditions to the molecule center of mass
         self.universe.atoms.wrap(compound='atoms')
 
+    def get_atom_index(self):
+        atom_index={}
+        for atom in self.universe.atoms:
+            atom_type = atom.element
+            if atom_type not in atom_index:
+                atom_index[atom_type] = []
+            atoms2=atom.index
+            atom_index[atom_type].append(atoms2)
+        return atom_index            
+        
     def get_atom_coordinates(self, frame):
         """
         Returns the coordinates for each atom type found in the specified frame in dictionary format.
         """
         self.universe.trajectory[frame]  # Set to the specified frame      
-        atom_coords = {}
-        for atom in self.universe.atoms:
-            atom_type = atom.element
-            if atom_type not in atom_coords:
-                atom_coords[atom_type] = []
-            atoms2=atom.position
-            atom_coords[atom_type].append(atoms2)  # Convert to list for better readability
-        
-        return atom_coords
+        atom_coords = []
+            
+        atom_coords=self.universe.atoms.positions
 
+        return atom_coords
+    
     def write_pdb(self, frame, output_filename):
         """
         Writes the centered structure to a PDB file.

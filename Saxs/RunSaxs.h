@@ -1,20 +1,35 @@
 #ifndef RUNSAXS_H
 #define RUNSAXS_H
-#include "Python3.h"
+#include <pybind11/embed.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/embed.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+
+#include <iostream>
+#include <vector>
+#include <map>
 #include <string>
+#include <algorithm>
+#include <numeric>
+#include <chrono>
+#include "Atoms.h"
 
 #pragma once
+namespace py = pybind11;
 
 class RunSaxs
 {
 public:
-    RunSaxs(std::string, std::string);
+    RunSaxs(std::string tpr, std::string xtd) : tpr_file(tpr), xtc_file(xtd) {};
 
     void Run(int, int, int);
     ~RunSaxs();
 
 private:
-    Python3 *script{nullptr};
+    std::string tpr_file, xtc_file;
+    std::vector<int> createVector(int, int, int);
+    std::vector<Atoms> atoms;
 };
 
 #endif
