@@ -20,6 +20,7 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 }
 void RunSaxs::Run(int beg, int end, int dt)
 {
+    std::cout << "Running SAXS" << Options::nx << ::endl;
     auto args = createVector(beg, end, dt);
     py::scoped_interpreter guard{}; // Start the interpreter and keep it alive for this scope
     std::string result;
@@ -79,6 +80,7 @@ void RunSaxs::Run(int beg, int end, int dt)
             std::cerr << "Python error: " << e.what() << std::endl;
         }
     }
+    std::cout << "Done " << args.size() << std::endl;
     auto end0 = std::chrono::high_resolution_clock::now();
 
     auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end0 - start);

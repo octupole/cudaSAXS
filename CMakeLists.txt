@@ -1,17 +1,18 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.5...3.20)
 #list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
 project(cudaSAXS LANGUAGES CXX CUDA)
 # Specify the CUDA and C++ standard
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CUDA_STANDARD 14)
+
 
 # Find Python and pybind11
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(pybind11 REQUIRED)
 
+
 # Find CUDA toolkit
-find_package(CUDA REQUIRED)
+find_package(CUDAToolkit REQUIRED)
 
 include(CheckCXXCompilerFlag)
 include(CheckIncludeFileCXX)
@@ -39,7 +40,7 @@ add_subdirectory(System)
 add_subdirectory(Saxs)
 
 # Specify the target executable
-add_executable(cudaSAXS cudaSAXS.cpp)
+add_executable(cudaSAXS cudaSAXS.cpp )
 
 target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Cuda ${PROJECT_SOURCE_DIR}/System ")
 

@@ -14,6 +14,7 @@
 #include <numeric>
 #include <chrono>
 #include "Atoms.h"
+#include "Options.h"
 
 #pragma once
 namespace py = pybind11;
