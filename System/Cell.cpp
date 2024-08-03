@@ -5,6 +5,18 @@
 
 std::vector<std::vector<float>> Cell::co = std::vector<std::vector<float>>(DIM, std::vector<float>(DIM, 0.0f));
 std::vector<std::vector<float>> Cell::oc = std::vector<std::vector<float>>(DIM, std::vector<float>(DIM, 0.0f));
+/**
+ * Calculates the transformation matrix (co) and its inverse (oc) based on the given cell parameters.
+ *
+ * @param a The length of the a-axis of the unit cell.
+ * @param b The length of the b-axis of the unit cell.
+ * @param c The length of the c-axis of the unit cell.
+ * @param alpha The angle between the b and c axes in degrees.
+ * @param beta The angle between the a and c axes in degrees.
+ * @param gamma The angle between the a and b axes in degrees.
+ *
+ * @throws std::invalid_argument If any of the cell parameters are invalid (e.g. negative lengths or angles outside the range of 0-180 degrees).
+ */
 void Cell::calculateMatrices(
     float a, float b, float c, float alpha, float beta, float gamma)
 {

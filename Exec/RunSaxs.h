@@ -15,6 +15,7 @@
 #include <chrono>
 #include "Atoms.h"
 #include "Options.h"
+#include "saxsKernel.h"
 
 #pragma once
 namespace py = pybind11;

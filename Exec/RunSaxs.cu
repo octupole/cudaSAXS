@@ -1,5 +1,15 @@
 #include "RunSaxs.h"
 
+/// Creates a vector of integers with a specified start, end, and step.
+///
+/// This function calculates the size of the vector based on the given start, end, and step values.
+/// It then creates a vector and fills it with sequential integers starting from 0, and transforms
+/// the values to match the desired sequence.
+///
+/// @param start The starting value for the sequence.
+/// @param end The ending value for the sequence.
+/// @param step The step size between values.
+/// @return A vector of integers representing the desired sequence.
 std::vector<int> RunSaxs::createVector(int start, int end, int step)
 {
     // Calculate the size of the vector
@@ -18,6 +28,16 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 
     return result;
 }
+/// Runs the SAXS (Small-Angle X-ray Scattering) analysis on a range of frames.
+///
+/// This function creates a vector of frame indices to process, and then iterates over each frame.
+/// For each frame, it retrieves the centered coordinates and box dimensions, calculates the
+/// transformation matrices, and runs the SAXS kernel on the coordinates. The elapsed time for
+/// the entire process is measured and printed.
+///
+/// @param beg The starting frame index.
+/// @param end The ending frame index.
+/// @param dt The step size between frames.
 void RunSaxs::Run(int beg, int end, int dt)
 {
     std::cout << "Running SAXS" << Options::nx << ::endl;
@@ -46,6 +66,9 @@ void RunSaxs::Run(int beg, int end, int dt)
     }
 
     auto start = std::chrono::high_resolution_clock::now();
+    saxsKernel myKernel(Options::nx, Options::ny, Options::nz, Options::order);
+    myKernel.setnpx(8);
+    myKernel.createMemory(Options::nnx, Options::nny, Options::nnz, Options::sigma);
 
     for (auto frame : args)
     {
@@ -56,23 +79,11 @@ void RunSaxs::Run(int beg, int end, int dt)
             py::object dims = analyzer.attr("get_dimensions_frame")(frame);
             auto box_dimensions = dims.cast<std::vector<float>>();
             Cell::calculateMatrices(box_dimensions);
-            auto &co = Cell::getCO();
-            auto &oc = Cell::getOC();
-
+            auto co = Cell::getCO();
+            auto oc = Cell::getOC();
             py::object coords_obj = analyzer.attr("get_centered_frame")(frame);
-            auto coords = coords_obj.cast<std::vector<std::vector<float>>>();
-            size_t O{0};
-            for (const auto &pair : index_map)
-            {
-                std::vector<std::vector<float>> vec0;
-                std::string key = pair.first;
-                std::vector<int> value = pair.second;
-                std::transform(value.begin(), value.end(), std::back_inserter(vec0), [&coords](int i)
-                               { return coords[i]; });
-                Atoms myAtoms(key, vec0);
-                atoms.push_back(myAtoms);
-            }
-            atoms.clear();
+            std::vector<std::vector<float>> coords = coords_obj.cast<std::vector<std::vector<float>>>();
+            myKernel.runPKernel(coords, index_map, oc);
         }
 
         catch (const py::error_already_set &e)

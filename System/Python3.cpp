@@ -1,6 +1,16 @@
 #include "Python3.h"
 #include "Atoms.h"
 
+/**
+ * Retrieves the atom coordinates for a given frame from a molecular dynamics trajectory.
+ *
+ * This function loads a Python script that analyzes a molecular dynamics trajectory and extracts the
+ * centered coordinates of the atoms for a specific frame. The coordinates are stored in a map
+ * where the keys are the atom names and the values are vectors of 3D coordinates.
+ *
+ * @param frame The frame number to retrieve the coordinates for.
+ * @return A map containing the centered coordinates of the atoms for the specified frame.
+ */
 void Python3::get_atoms(int frame)
 {
     //    py::scoped_interpreter guard{}; // Start the interpreter and keep it alive for this scope

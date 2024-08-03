@@ -9,9 +9,9 @@ class Options
 public:
     static std::string tpr_file, xtc_file;
     static int nx, ny, nz;
+    static int nnx, nny, nnz;
     static float sigma, Dq;
-    static std::vector<int> myN;
-    static std::vector<int> myNS;
+    static int order;
 
 private:
     Options() {};
