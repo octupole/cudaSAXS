@@ -56,20 +56,6 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
  * @param nnz The number of grid points in the z-dimension.
  */
 __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
-                              /**
-                               * @brief Performs scattering calculations on a grid of complex values.
-                               *
-                               * This kernel function calculates the scattering contribution for each grid point
-                               * based on the provided scattering factors and the grid of complex values.
-                               *
-                               * @param grid_q The input grid of complex values.
-                               * @param grid_oq The output grid of complex values.
-                               * @param oc The orientation coefficients.
-                               * @param Scatter The scattering factors.
-                               * @param nnx The number of grid points in the x-dimension.
-                               * @param nny The number of grid points in the y-dimension.
-                               * @param nnz The number of grid points in the z-dimension.
-                               */
                               float *Scatter, int nnx, int nny, int nnz)
 {
 
