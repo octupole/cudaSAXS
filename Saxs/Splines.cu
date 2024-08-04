@@ -18,7 +18,8 @@ __host__ __device__ void Splines::Init(const float w)
     theta.x[1] = w;
     theta.x[0] = 1.0 - w;
 }
-/// Performs one pass of the spline calculation.
+
+/// Performs one pass of the spline calculationdd.
 ///
 /// This function updates the spline coefficients `theta.x` based on the current weight parameter `w` and the current pass index `k1`.
 /// The first coefficient `theta.x[k-1]` is calculated using the previous coefficient `theta.x[k-2]`. The remaining coefficients
