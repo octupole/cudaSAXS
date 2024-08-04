@@ -112,7 +112,7 @@ class TrajectoryStructures:
         return molecule_dict
  
     def get_centered_frame(self, frame):
-        self.center_on_protein_barycenter(frame)
+#        self.center_on_protein_barycenter(frame)
         return self.get_atom_coordinates(frame)
 
     def get_dimensions_frame(self, frame):

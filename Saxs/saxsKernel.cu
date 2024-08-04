@@ -3,6 +3,7 @@
 #include "Scattering.h"
 #include "opsfact.h"
 #include <cuda_runtime.h> // Include CUDA runtime header
+#include <cuComplex.h>
 // Kernel to calculate |K| values and populate the histogram
 __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, int num_bins)
@@ -38,13 +39,14 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         {
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            auto v0 = cuCrealf(d_array[idx]);
+            auto v0 = d_array[idx];
             if (k != 0 && k != npz - 1)
             {
-                auto v1 = cuCrealf(d_array[idbx]);
-                v0 = 0.5 * (v0 + v1);
+                auto v1 = d_array[idbx];
+                v0 = cuCaddf(v0, v1);
+                v0 = cuCmulf(v0, make_cuFloatComplex(0.5f, 0.0f));
             }
-            atomicAdd(&d_histogram[bin], v0);
+            atomicAdd(&d_histogram[bin], cuCrealf(v0));
             atomicAdd(&d_nhist[bin], 1.0f);
         }
     }
@@ -172,14 +174,9 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
 
     if (idx < numParticles)
     {
-
-        float g_x[DIM][MAX_ORDER], g_dx[DIM][MAX_ORDER];
         Splines bsplineX;
         Splines bsplineY;
         Splines bsplineZ;
-        bsplineX.allocate_device(&g_x[XX][0], &g_dx[XX][0]);
-        bsplineY.allocate_device(&g_x[YY][0], &g_dx[YY][0]);
-        bsplineZ.allocate_device(&g_x[ZZ][0], &g_dx[ZZ][0]);
 
         int nx0 = static_cast<int>(nx);
         int ny0 = static_cast<int>(ny);
@@ -203,7 +200,6 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
         spline splX = bsplineX(gx);
         spline splY = bsplineX(gy);
         spline splZ = bsplineX(gz);
-
         int i0 = mx - order;
 
         for (auto o = 0; o < order; o++)
@@ -252,18 +248,14 @@ __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int nnpz = 2 * (nnz / 2 + 1);
     if (x < nnx && y < nny && z < nnz)
     {
-        int idx_s = z + y * nnpz + x * nnpz * nny;
+        int idx_s = z + y * nnz + x * nnz * nny;
+        d_gridSup[idx_s] = myDens;
         if (x < nx && y < ny && z < nz)
         {
             int idx = z + y * nz + x * nz * ny;
             d_gridSup[idx_s] = d_grid[idx];
-        }
-        else
-        {
-            d_gridSup[idx_s] = myDens;
         }
     }
 }
@@ -316,8 +308,6 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
  */
 void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map, std::vector<std::vector<float>> &oc)
 {
-    cufftHandle plan;
-    cufftPlan3d(&plan, nnx, nny, nnz, CUFFT_R2C);
     // Cudaevents
 
     // cudaEvent_t start, stop;
@@ -349,14 +339,18 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     const int THREADS_PER_BLOCK = 256;
     int numBlocksGrid = (d_grid.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     int numBlocksGridSuperC = (d_gridSupC.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int numBlocksGridSuperAcc = (d_gridSupAcc.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     int numBlocksGridSuper = (d_gridSup.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     // zeroes the Sup density grid
-    zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
+    zeroDensityKernel<<<numBlocksGridSuperAcc, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_gridSupAcc.size());
 
     int totParticles = 0;
     for (const auto &pair : index_map)
     {
+        cufftHandle plan;
+        cufftPlan3d(&plan, nnx, nny, nnz, CUFFT_R2C);
+
         thrust::host_vector<float> h_Dens = {0.0f};
         thrust::host_vector<int> h_count = {0};
         thrust::device_vector<float> d_Dens = h_Dens;
@@ -393,9 +387,9 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
 
         rhoKernel<<<numBlocks, THREADS_PER_BLOCK>>>(d_particles_ptr, d_grid_ptr, order,
                                                     numParticles, nx, ny, nz);
+
         // Synchronize the device
         cudaDeviceSynchronize();
-
         paddingKernel<<<gridDim0, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
                                               thrust::raw_pointer_cast(d_Dens.data()),
                                               thrust::raw_pointer_cast(d_count.data()));
@@ -406,27 +400,63 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         h_count = d_count;
         float myDens = h_Dens[0] / (float)h_count[0];
         // zeroes the Sup density grid
-        zeroDensityKernel<<<numBlocksGridSuper, THREADS_PER_BLOCK>>>(d_gridSup_ptr, d_gridSup.size());
+        zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
         cudaDeviceSynchronize();
         superDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
 
         // Synchronize the device
         cudaDeviceSynchronize();
+        // if (type == "H")
+        // {
+        //     auto idx = [&](int i, int j, int k)
+        //     { int npz=nz/2+1; return i * ny * npz + j * npz + k; };
 
-        cufftExecR2C(plan, d_gridSup_ptr, (cuFloatComplex *)d_gridSup_ptr);
+        //     h_gridSup = d_gridSup;
+        //     std::cout << type << " Grid size:  " << cuCrealf(h_sup[idx(10, 4, 7)]) << std::endl;
+        // }
+        // if (type == "H")
+        // {
+        //     int x{0}, y{0}, z{0};
 
+        //     h_gridSup = d_gridSup;
+        //     h_grid = d_grid;
+        //     int idx_s = z + y * nnz + x * nnz * nny;
+        //     int idx = z + y * nz + x * nz * ny;
+        //     printf(" %d %d %f %f \n", idx_s, idx, h_gridSup[idx_s], myDens);
+        // }
+
+        cufftExecR2C(plan, d_gridSup_ptr, d_gridSupC_ptr);
+        cudaDeviceSynchronize();
         // Synchronize the device
-        scatterKernel<<<gridDim, blockDim>>>((cuFloatComplex *)d_gridSup_ptr, d_gridSupC_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz);
+        scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz);
         cudaDeviceSynchronize();
     }
 
     // // Synchronize the device
     // cudaDeviceSynchronize();
-    modulusKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
+    {
+        auto idx = [&](int i, int j, int k)
+        { int nnpz=(nnz/2+1); return i * nny * nnpz + j * nnpz + k; };
+
+        h_gridSupAcc = d_gridSupAcc;
+
+        std::cout << "before Mod i" << " Grid size: r  " << cuCrealf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
+        std::cout << "before Mod c" << " Grid size: i " << cuCimagf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
+    }
+    modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
+    {
+        auto idx = [&](int i, int j, int k)
+        { int nnpz=(nnz/2+1); return i * nny * nnpz + j * nnpz + k; };
+
+        h_gridSupAcc = d_gridSupAcc;
+
+        std::cout << "after Mod i" << " Grid size: r  " << cuCrealf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
+        std::cout << "after Mod c" << " Grid size: i " << cuCimagf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
+    }
 
     // // Synchronize the device
     cudaDeviceSynchronize();
-    calculate_histogram<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
+    calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                bin_size, num_bins);
 
     // cudaDeviceSynchronize();
@@ -447,7 +477,7 @@ std::vector<std::vector<float>> saxsKernel::getSaxs()
     std::vector<std::vector<float>> saxs;
     thrust::host_vector<float> h_histogram = d_histogram;
     thrust::host_vector<float> h_nhist = d_nhist;
-    for (auto o{1}; o < h_histogram.size(); o++)
+    for (auto o{0}; o < h_histogram.size(); o++)
     {
         if (h_nhist[o] != 0.0f)
         {
@@ -511,16 +541,19 @@ void saxsKernel::createMemory(int &nnx, int &nny, int &nnz, float sigma, float D
     d_moduleZ_ptr = thrust::raw_pointer_cast(d_moduleZ.data());
 
     thrust::host_vector<float> h_grid(nx * ny * nz);
-    thrust::host_vector<float> h_gridSup(2 * nnx * nny * nnpz);
+    thrust::host_vector<float> h_gridSup(nnx * nny * nnz);
     thrust::host_vector<cuFloatComplex> h_gridSupC(nnx * nny * nnpz);
+    thrust::host_vector<cuFloatComplex> h_gridSupAcc(nnx * nny * nnpz);
 
     d_grid = h_grid;
     d_gridSup = h_gridSup;
     d_gridSupC = h_gridSupC;
+    d_gridSupAcc = h_gridSupAcc;
 
     d_grid_ptr = thrust::raw_pointer_cast(d_grid.data());
     d_gridSup_ptr = thrust::raw_pointer_cast(d_gridSup.data());
     d_gridSupC_ptr = thrust::raw_pointer_cast(d_gridSupC.data());
+    d_gridSupAcc_ptr = thrust::raw_pointer_cast(d_gridSupAcc.data());
     // Do bspmod
 }
 /**

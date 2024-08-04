@@ -61,12 +61,25 @@ private:
     thrust::device_vector<float> d_moduleZ;
     thrust::device_vector<float> d_grid;
     thrust::device_vector<float> d_gridSup;
+    thrust::device_vector<cuFloatComplex> d_gridSupAcc;
     thrust::device_vector<cuFloatComplex> d_gridSupC;
     thrust::device_vector<float> d_histogram;
     thrust::device_vector<float> d_nhist;
+
+    thrust::host_vector<float> h_moduleX;
+    thrust::host_vector<float> h_moduleY;
+    thrust::host_vector<float> h_moduleZ;
+    thrust::host_vector<float> h_grid;
+    thrust::host_vector<float> h_gridSup;
+    thrust::host_vector<cuFloatComplex> h_gridSupC;
+    thrust::host_vector<cuFloatComplex> h_gridSupAcc;
+    thrust::host_vector<float> h_histogram;
+    thrust::host_vector<float> h_nhist;
+
     float *d_grid_ptr{nullptr};
     float *d_gridSup_ptr{nullptr};
     cuFloatComplex *d_gridSupC_ptr{nullptr};
+    cuFloatComplex *d_gridSupAcc_ptr{nullptr};
     // Do bspmod
     float *d_moduleX_ptr{nullptr};
     float *d_moduleY_ptr{nullptr};

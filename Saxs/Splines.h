@@ -13,7 +13,7 @@ struct spline
 class Splines
 {
 public:
-    __host__ __device__ Splines(int ord = 5) : order(ord)
+    __host__ __device__ Splines(int ord = 4) : order(ord)
     {
     }
 
@@ -29,7 +29,7 @@ private:
     __host__ __device__ void OnePass(const float w, const int k);
     __host__ __device__ void Diff();
 
-    int order{5};
+    int order{4};
     spline theta;
 };
 
