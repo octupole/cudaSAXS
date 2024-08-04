@@ -25,6 +25,7 @@ include_directories("${PROJECT_SOURCE_DIR}/System")
 include_directories("${PROJECT_SOURCE_DIR}/Saxs")
 include_directories("${PROJECT_SOURCE_DIR}/Utilities")
 include_directories("${PROJECT_SOURCE_DIR}/Exec")
+include_directories("${PROJECT_SOURCE_DIR}/fmt/include")
 # Include directories for Python3 and Pybind11
 include_directories(${Python3_INCLUDE_DIRS})
 include_directories(${pybind11_INCLUDE_DIRS})
@@ -35,8 +36,9 @@ link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 # Set the CUDA architectures you want to support
 set(CMAKE_CUDA_ARCHITECTURES 89)
 # Enable optimization flags
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 -rdc=true -use_fast_math --generate-code arch=compute_89,code=[sm_89,compute_89] -Xcompiler -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 128 -O3 -rdc=true -use_fast_math --generate-code arch=compute_89,code=[sm_89,compute_89] -Xcompiler -O3")
 
+add_subdirectory(fmt)
 add_subdirectory(Utilities)
 add_subdirectory(System)
 add_subdirectory(Saxs)
@@ -51,7 +53,7 @@ target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT
 set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries
-target_link_libraries(cudaSAXS exec saxs system utils ${CUDA_LIBRARIES} cufft Python3::Python pybind11::module)
+target_link_libraries(cudaSAXS exec saxs system utils ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module)
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages

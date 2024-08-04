@@ -22,6 +22,8 @@ public:
      */
     static void calculateMatrices(
         float a, float b, float c, float alpha, float beta, float gamma);
+    static void calculateMatrices(
+        float a, float b, float c, float alpha, float beta, float gamma, float sigma);
     static void calculateMatrices(std::vector<float> &cell_parameters)
     {
         if (cell_parameters.size() != 6)
@@ -30,7 +32,21 @@ public:
         }
         else
         {
-            calculateMatrices(cell_parameters[0], cell_parameters[1], cell_parameters[2], cell_parameters[3], cell_parameters[4], cell_parameters[5]);
+            calculateMatrices(cell_parameters[0], cell_parameters[1], cell_parameters[2],
+                              cell_parameters[3], cell_parameters[4], cell_parameters[5]);
+            return;
+        }
+    };
+    static void calculateMatrices(std::vector<float> &cell_parameters, float sigma)
+    {
+        if (cell_parameters.size() != 6)
+        {
+            throw std::invalid_argument("Cell parameters must be a vector of length 6.");
+        }
+        else
+        {
+            calculateMatrices(cell_parameters[0], cell_parameters[1], cell_parameters[2],
+                              cell_parameters[3], cell_parameters[4], cell_parameters[5], sigma);
             return;
         }
     };

@@ -16,6 +16,7 @@
 #include "Atoms.h"
 #include "Options.h"
 #include "saxsKernel.h"
+#include <fmt/core.h>
 
 #pragma once
 namespace py = pybind11;
@@ -29,6 +30,7 @@ public:
     ~RunSaxs();
 
 private:
+    void writeBanner();
     std::string tpr_file, xtc_file;
     std::vector<int> createVector(int, int, int);
     std::vector<Atoms> atoms;

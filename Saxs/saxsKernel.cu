@@ -3,6 +3,53 @@
 #include "Scattering.h"
 #include "opsfact.h"
 #include <cuda_runtime.h> // Include CUDA runtime header
+// Kernel to calculate |K| values and populate the histogram
+__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
+                                    float bin_size, int num_bins)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int npz = nz / 2 + 1;
+    if (i < nx && j < ny && k < npz)
+    { // Only consider the upper half in z-direction
+
+        int nfx = (nx % 2 == 0) ? nx / 2 : nx / 2 + 1;
+        int nfy = (ny % 2 == 0) ? ny / 2 : ny / 2 + 1;
+        int nfz = (nz % 2 == 0) ? nz / 2 : nz / 2 + 1;
+
+        int ia = (i < nfx) ? i : i - nx;
+        int ja = (j < nfy) ? j : j - ny;
+        int ka = (k < nfz) ? k : k - nz;
+        int ib = i == 0 ? 0 : nx - i;
+        int jb = j == 0 ? 0 : ny - j;
+        float mw1, mw2, mw3, mw;
+        mw1 = oc[XX * DIM + XX] * ia + oc[XX * DIM + YY] * ja + oc[XX * DIM + ZZ] * ka;
+        mw1 = 2.0 * M_PI * mw1;
+        mw2 = oc[YY * DIM + XX] * ia + oc[YY * DIM + YY] * ja + oc[YY * DIM + ZZ] * ka;
+        mw2 = 2.0 * M_PI * mw2;
+        mw3 = oc[ZZ * DIM + XX] * ia + oc[ZZ * DIM + YY] * ja + oc[ZZ * DIM + ZZ] * ka;
+        mw3 = 2.0 * M_PI * mw3;
+        mw = sqrtf(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
+        if (mw > 3.0)
+            return;
+        int bin = static_cast<int>(mw / bin_size);
+        if (bin < num_bins)
+        {
+            int idx = k + j * npz + i * npz * ny;
+            int idbx = k + jb * npz + ib * npz * ny;
+            auto v0 = cuCrealf(d_array[idx]);
+            if (k != 0 && k != npz - 1)
+            {
+                auto v1 = cuCrealf(d_array[idbx]);
+                v0 = 0.5 * (v0 + v1);
+            }
+            atomicAdd(&d_histogram[bin], v0);
+            atomicAdd(&d_nhist[bin], 1.0f);
+        }
+    }
+}
+
 /**
  * @brief Applies a modulus calculation to a grid of complex values.
  *
@@ -24,21 +71,19 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nnx);
-    int ny0 = static_cast<int>(nny);
-    int nz0 = static_cast<int>(nnz);
-    if (i < nx0 && j < ny0 && k < (nz0 / 2 + 1))
+    int nnpz = nnz / 2 + 1;
+    if (i < nnx && j < nny && k < nnpz)
     {
-        int idx = i + j * nx0 + k * nx0 * ny0;
+        int idx = k + j * nnpz + i * nnpz * nny;
         float bsp_i = modX[i];
         float bsp_j = modX[j];
         float bsp_k = modX[k];
+        float bsp_ijk = bsp_i * bsp_j * bsp_k / (float)numParticles;
 
-        cuFloatComplex bsp = make_cuComplex(bsp_i * bsp_j * bsp_k, 0.0f);
-        cuFloatComplex conj = cuConjf(grid_q[idx]);
-        cuFloatComplex product = cuCmulf(conj, bsp);
-        cuFloatComplex D = make_cuComplex(1.0f / (float)numParticles, 0.0f);
-        grid_q[idx] = cuCmulf(cuCmulf(grid_q[idx], product), D);
+        cuFloatComplex bsp = make_cuComplex(bsp_ijk, 0.0f);
+        cuFloatComplex product = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
+
+        grid_q[idx] = cuCmulf(product, bsp);
     }
 }
 /**
@@ -59,24 +104,23 @@ __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, f
                               float *Scatter, int nnx, int nny, int nnz)
 {
 
+    // if (idx >= nx0 * ny0 * (nz0 / 2 + 1))
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
     int k = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nnx);
-    int ny0 = static_cast<int>(nny);
-    int nz0 = static_cast<int>(nnz);
-    int nfx = (nx0 % 2 == 0) ? nx0 / 2 : nx0 / 2 + 1;
-    int nfy = (ny0 % 2 == 0) ? ny0 / 2 : ny0 / 2 + 1;
-    int nfz = (nz0 % 2 == 0) ? nz0 / 2 : nz0 / 2 + 1;
-    if (i < nx0 && j < ny0 && k < (nz0 / 2 + 1))
+    int nfx = (nnx % 2 == 0) ? nnx / 2 : nnx / 2 + 1;
+    int nfy = (nny % 2 == 0) ? nny / 2 : nny / 2 + 1;
+    int nfz = (nnz % 2 == 0) ? nnz / 2 : nnz / 2 + 1;
+    int nnpz = nnz / 2 + 1;
+    if (i < nnx && j < nny && k < nnpz)
     {
-        int idx = i + j * nx0 + k * nx0 * ny0;
-        // printf("i: %d, j: %d, k: %d\n", i, j, k);
+        int idx = k + j * nnpz + i * nnpz * nny;
+
         opsfact ff;
         ff.allocate_device(Scatter);
-        int ia = (i < nfx) ? i : i - nx0;
-        int ja = (j < nfy) ? j : j - ny0;
-        int ka = (k < nfz) ? k : k - nz0;
+        int ia = (i < nfx) ? i : i - nnx;
+        int ja = (j < nfy) ? j : j - nny;
+        int ka = (k < nfz) ? k : k - nnz;
         float mw1, mw2, mw3, mw;
         mw1 = oc[XX * DIM + XX] * ia + oc[XX * DIM + YY] * ja + oc[XX * DIM + ZZ] * ka;
         mw2 = oc[YY * DIM + XX] * ia + oc[YY * DIM + YY] * ja + oc[YY * DIM + ZZ] * ka;
@@ -86,10 +130,27 @@ __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, f
         mw3 = 2.0 * M_PI * mw3;
         mw = sqrt(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
         cuFloatComplex fq = make_cuComplex(ff(mw), 0.0f);
-
-        grid_oq[idx] = cuCaddf(grid_oq[idx], cuCmulf(fq, grid_q[idx]));
+        cuFloatComplex mult = cuCmulf(fq, grid_q[idx]);
+        grid_oq[idx] = cuCaddf(grid_oq[idx], mult);
     }
 }
+__global__ void zeroDensityKernel(float *d_grid, size_t size)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < (int)size)
+    {
+        d_grid[idx] = 0.0f;
+    }
+}
+__global__ void zeroDensityKernel(cuFloatComplex *d_grid, size_t size)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < (int)size)
+    {
+        d_grid[idx] = make_cuComplex(0.0f, 0.0f);
+    }
+}
+
 /**
  * @brief Computes the density contribution of each particle to the grid.
  *
@@ -161,7 +222,7 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
                     float fact_o = splX.x[o];
                     float fact_p = fact_o * splY.x[p];
                     float fact_q = fact_p * splZ.x[q];
-                    int ig = i + j * nx0 + k * nx0 * ny0;
+                    int ig = k + j * nz0 + i * nz0 * ny0;
                     atomicAdd(&grid[ig], fact_q);
                     k0++;
                 }
@@ -191,68 +252,22 @@ __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nnx);
-    int ny0 = static_cast<int>(nny);
-    int nz0 = static_cast<int>(nnz);
-    if (x < nx0 && y < ny0 && z < nz0)
+    int nnpz = 2 * (nnz / 2 + 1);
+    if (x < nnx && y < nny && z < nnz)
     {
-        int idx_s = x + y * nx0 + z * nx0 * ny0;
-        d_gridSup[idx_s] = myDens;
+        int idx_s = z + y * nnpz + x * nnpz * nny;
         if (x < nx && y < ny && z < nz)
         {
-            int idx = x + y * nx + z * nx * ny;
+            int idx = z + y * nz + x * nz * ny;
             d_gridSup[idx_s] = d_grid[idx];
+        }
+        else
+        {
+            d_gridSup[idx_s] = myDens;
         }
     }
 }
-/**
- * @brief Initializes a 3D grid of complex numbers with zero values.
- *
- * This CUDA kernel function initializes a 3D grid of cuFloatComplex values to zero. The grid is represented as a 1D array, and the kernel function calculates the 1D index from the 3D coordinates of each grid point.
- *
- * @param d_grid Pointer to the 1D array representing the 3D grid of cuFloatComplex values.
- * @param nx The size of the grid in the x-dimension.
- * @param ny The size of the grid in the y-dimension.
- * @param nz The size of the grid in the z-dimension.
- */
-__global__ void initializeIqKernel(cuFloatComplex *d_grid, int nx, int ny, int nz)
-{
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nx);
-    int ny0 = static_cast<int>(ny);
-    int nz0 = static_cast<int>(nz);
-    if (x < nx0 && y < ny0 && z < nz0)
-    {
-        int idx = x + y * nx0 + z * nx0 * ny0;
-        d_grid[idx] = make_cuComplex(0.0f, 0.0f);
-    }
-}
-/**
- * @brief Initializes a 3D grid of floating-point values to zero.
- *
- * This CUDA kernel function initializes a 3D grid of floating-point values to zero. The grid is represented as a 1D array, and the kernel function calculates the 1D index from the 3D coordinates of each grid point.
- *
- * @param d_grid Pointer to the 1D array representing the 3D grid of floating-point values.
- * @param nx The size of the grid in the x-dimension.
- * @param ny The size of the grid in the y-dimension.
- * @param nz The size of the grid in the z-dimension.
- */
-__global__ void initializeDensityKernel(float *d_grid, int nx, int ny, int nz)
-{
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nx);
-    int ny0 = static_cast<int>(ny);
-    int nz0 = static_cast<int>(nz);
-    if (x < nx0 && y < ny0 && z < nz0)
-    {
-        int idx = x + y * nx0 + z * nx0 * ny0;
-        d_grid[idx] = 0.0f;
-    }
-}
+
 /**
  * @brief Performs padding on a 3D grid, computing the average density and count of points on the border.
  *
@@ -273,20 +288,17 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int nx0 = static_cast<int>(nx);
-    int ny0 = static_cast<int>(ny);
-    int nz0 = static_cast<int>(nz);
     int mx = nx - dx;
     int my = ny - dy;
     int mz = nz - dz;
-    if (x < nx0 && y < ny0 && z < nz0)
+    if (x < nx && y < ny && z < nz)
     {
-        int idx = x + y * nx0 + z * nx0 * ny0;
+        int idx = z + y * nz + x * nz * ny;
         bool cond1 = (x > dx && x < mx) && (y > dy && y < my) && (z > dz && z < mz);
         if (!cond1)
         {
-            atomicAdd(count, 1);
-            atomicAdd(Dens, grid[idx]);
+            atomicAdd(&count[0], 1);
+            atomicAdd(&Dens[0], grid[idx]);
         }
     }
 }
@@ -314,17 +326,15 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     // cudaEventRecord(start);
 
     // to compute average density on the border
-    thrust::host_vector<float> h_Dens = {0.0f};
-    thrust::host_vector<int> h_count = {0};
-    thrust::device_vector<float> d_Dens = h_Dens;
-    thrust::device_vector<int> d_count = h_count;
     int mx = borderBins(nx, SHELL);
     int my = borderBins(ny, SHELL);
     int mz = borderBins(nz, SHELL);
+    float mySigma = (float)Options::nx / (float)Options::nnx;
+
     thrust::host_vector<float> h_oc(DIM * DIM);
     for (int i = 0; i < DIM; ++i)
         for (int j = 0; j < DIM; ++j)
-            h_oc[i * DIM + j] = oc[i][j];
+            h_oc[i * DIM + j] = mySigma * oc[i][j];
 
     thrust::device_vector<float> d_oc = h_oc;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
@@ -333,22 +343,24 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     dim3 gridDim((nnx + blockDim.x - 1) / blockDim.x,
                  (nny + blockDim.y - 1) / blockDim.y,
                  (nnz + blockDim.z - 1) / blockDim.z);
-    auto nnpz = nnz / 2 + 1;
-    initializeIqKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, nnx, nny, nnpz);
+    dim3 gridDim0((nx + blockDim.x - 1) / blockDim.x,
+                  (ny + blockDim.y - 1) / blockDim.y,
+                  (nz + blockDim.z - 1) / blockDim.z);
+    const int THREADS_PER_BLOCK = 256;
+    int numBlocksGrid = (d_grid.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int numBlocksGridSuperC = (d_gridSupC.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int numBlocksGridSuper = (d_gridSup.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    /**
-     * Processes a set of particles and computes their contribution to the SAXS intensity.
-     *
-     * This function iterates over a set of particles, transforms their coordinates based on the orientation matrix,
-     * and computes their contribution to the SAXS intensity. It then performs padding, supersampling, and Fourier
-     * transform operations on the density grid to compute the final SAXS intensity.
-     *
-     * @param coords A vector of particle coordinates.
-     * @param index_map A map of particle indices, where the keys are particle types and the values are vectors of indices.
-     * @param oc The orientation matrix.
-     */
+    // zeroes the Sup density grid
+    zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
+
+    int totParticles = 0;
     for (const auto &pair : index_map)
     {
+        thrust::host_vector<float> h_Dens = {0.0f};
+        thrust::host_vector<int> h_count = {0};
+        thrust::device_vector<float> d_Dens = h_Dens;
+        thrust::device_vector<int> d_count = h_count;
         std::string type = pair.first;
         std::vector<int> value = pair.second;
         std::vector<std::vector<float>> Particles;
@@ -357,6 +369,7 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
                        { return coords[i]; });
 
         this->numParticles = Particles.size();
+        totParticles += this->numParticles;
 
         // Allocate and copy particles to the device
         thrust::host_vector<float> h_particles(numParticles * 3);
@@ -374,28 +387,27 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         float *d_particles_ptr = thrust::raw_pointer_cast(d_particles.data());
         float *d_scatter_ptr = thrust::raw_pointer_cast(d_scatter.data());
 
-        const int THREADS_PER_BLOCK = 256;
         int numBlocks = (numParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-        initializeDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, nx, ny, nz);
-
-        // Synchronize the device
-        cudaDeviceSynchronize();
+        zeroDensityKernel<<<numBlocksGrid, THREADS_PER_BLOCK>>>(d_grid_ptr, d_grid.size());
 
         rhoKernel<<<numBlocks, THREADS_PER_BLOCK>>>(d_particles_ptr, d_grid_ptr, order,
                                                     numParticles, nx, ny, nz);
         // Synchronize the device
         cudaDeviceSynchronize();
 
-        paddingKernel<<<gridDim, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
-                                             thrust::raw_pointer_cast(d_Dens.data()),
-                                             thrust::raw_pointer_cast(d_count.data()));
+        paddingKernel<<<gridDim0, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
+                                              thrust::raw_pointer_cast(d_Dens.data()),
+                                              thrust::raw_pointer_cast(d_count.data()));
         // Synchronize the device
         cudaDeviceSynchronize();
 
         h_Dens = d_Dens;
         h_count = d_count;
         float myDens = h_Dens[0] / (float)h_count[0];
+        // zeroes the Sup density grid
+        zeroDensityKernel<<<numBlocksGridSuper, THREADS_PER_BLOCK>>>(d_gridSup_ptr, d_gridSup.size());
+        cudaDeviceSynchronize();
         superDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
 
         // Synchronize the device
@@ -404,17 +416,19 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         cufftExecR2C(plan, d_gridSup_ptr, (cuFloatComplex *)d_gridSup_ptr);
 
         // Synchronize the device
-        cudaDeviceSynchronize();
-
         scatterKernel<<<gridDim, blockDim>>>((cuFloatComplex *)d_gridSup_ptr, d_gridSupC_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz);
-
-        // Synchronize the device
-        cudaDeviceSynchronize();
-        modulusKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, numParticles, nnx, nny, nnz);
-
-        // Synchronize the device
         cudaDeviceSynchronize();
     }
+
+    // // Synchronize the device
+    // cudaDeviceSynchronize();
+    modulusKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
+
+    // // Synchronize the device
+    cudaDeviceSynchronize();
+    calculate_histogram<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
+                                               bin_size, num_bins);
+
     // cudaDeviceSynchronize();
     // cudaEventRecord(stop);
     // cudaEventSynchronize(stop);
@@ -426,6 +440,22 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     // // Destroy the events
     // cudaEventDestroy(start);
     // cudaEventDestroy(stop);
+}
+std::vector<std::vector<float>> saxsKernel::getSaxs()
+{
+
+    std::vector<std::vector<float>> saxs;
+    thrust::host_vector<float> h_histogram = d_histogram;
+    thrust::host_vector<float> h_nhist = d_nhist;
+    for (auto o{1}; o < h_histogram.size(); o++)
+    {
+        if (h_nhist[o] != 0.0f)
+        {
+            vector<float> val = {o * this->bin_size, h_histogram[o] / h_nhist[o]};
+            saxs.push_back(val);
+        }
+    }
+    return saxs;
 }
 
 /**
@@ -441,7 +471,7 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
  * @param[in,out] nnz The optimal z-dimension of the super-grid.
  * @param[in] sigma The sigma value used to calculate the optimal grid sizes.
  */
-void saxsKernel::createMemory(int &nnx, int &nny, int &nnz, float sigma)
+void saxsKernel::createMemory(int &nnx, int &nny, int &nnz, float sigma, float Dq)
 {
     this->sigma = sigma;
     if (nnx == 0)
@@ -458,10 +488,16 @@ void saxsKernel::createMemory(int &nnx, int &nny, int &nnz, float sigma)
     }
 
     size_t nnpz = nnz / 2 + 1;
-
+    this->bin_size = Dq;
+    int max_k = 20.0f;
+    this->num_bins = static_cast<int>(max_k / bin_size) + 1;
+    thrust::host_vector<float> h_histogram(num_bins, 0.0f);
+    thrust::host_vector<float> h_nhist(num_bins, 0.0f);
+    d_histogram = h_histogram;
+    d_nhist = h_nhist;
+    d_histogram_ptr = thrust::raw_pointer_cast(d_histogram.data());
+    d_nhist_ptr = thrust::raw_pointer_cast(d_nhist.data());
     BSpline::BSpmod *bsp_modx = new BSpline::BSpmod(nx, ny, nz);
-    std::cout << "Cell with nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
-    std::cout << "SuperCell with nnx: " << nnx << " nny: " << nny << " nnz: " << nnz << std::endl;
 
     thrust::host_vector<float> h_moduleX = bsp_modx->ModX();
     thrust::host_vector<float> h_moduleY = bsp_modx->ModY();

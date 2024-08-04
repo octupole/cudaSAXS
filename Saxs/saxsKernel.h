@@ -10,6 +10,7 @@
 #ifndef SAXSKERNEL_H
 #define SAXSKERNEL_H
 #include "Splines.h"
+#include "Options.h"
 #include <vector>
 #include <cufft.h>
 #include <cuComplex.h>
@@ -40,7 +41,9 @@ public:
         npz = _npx;
     }
     void runPKernel(std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
-    void createMemory(int &, int &, int &, float sigma);
+    void createMemory(int &, int &, int &, float sigma, float Dq);
+
+    std::vector<std::vector<float>> getSaxs();
 
     ~saxsKernel();
 
@@ -51,13 +54,16 @@ private:
     int nx, ny, nz, nnx, nny, nnz;
     int numParticles;
     float sigma;
-
+    float bin_size;
+    int num_bins;
     thrust::device_vector<float> d_moduleX;
     thrust::device_vector<float> d_moduleY;
     thrust::device_vector<float> d_moduleZ;
     thrust::device_vector<float> d_grid;
     thrust::device_vector<float> d_gridSup;
     thrust::device_vector<cuFloatComplex> d_gridSupC;
+    thrust::device_vector<float> d_histogram;
+    thrust::device_vector<float> d_nhist;
     float *d_grid_ptr{nullptr};
     float *d_gridSup_ptr{nullptr};
     cuFloatComplex *d_gridSupC_ptr{nullptr};
@@ -65,6 +71,8 @@ private:
     float *d_moduleX_ptr{nullptr};
     float *d_moduleY_ptr{nullptr};
     float *d_moduleZ_ptr{nullptr};
+    float *d_histogram_ptr{nullptr};
+    float *d_nhist_ptr{nullptr};
     std::function<int(int, double)> borderBins = [](int nx, double shell) -> int
     {
         return static_cast<int>(shell * nx / 2);
@@ -72,6 +80,9 @@ private:
 
     std::vector<long long> generateMultiples(long long limit);
     long long findClosestProduct(int n, double sigma);
+    friend __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *nhist, float *oc, int nx, int ny, int nz,
+                                               float bin_size, int num_bins);
+
     friend __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
                                          int numParticles, int nnx, int nny, int nnz);
 
@@ -81,8 +92,8 @@ private:
                                      int numParticles, int nx, int ny, int nz);
     friend __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens,
                                               int nx, int ny, int nz, int nnx, int nny, int nnz);
-    friend __global__ void initializeDensityKernel(float *d_grid, int nx, int ny, int nz);
-    friend __global__ void initializeIqKernel(cuFloatComplex *d_grid, int nx, int ny, int nz);
+    friend __global__ void zeroDensityKernel(float *d_grid, int size);
+    friend __global__ void zeroDensityKernel(cuFloatComplex *d_grid, size_t size);
     friend __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int dy, int dz, float *Dens, int *count);
 };
 

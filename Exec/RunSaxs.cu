@@ -1,5 +1,5 @@
 #include "RunSaxs.h"
-
+#include <fstream>
 /// Creates a vector of integers with a specified start, end, and step.
 ///
 /// This function calculates the size of the vector based on the given start, end, and step values.
@@ -28,6 +28,22 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 
     return result;
 }
+void RunSaxs::writeBanner()
+{
+    std::string banner = fmt::format(
+        "*************************************************\n"
+        "* {:^40}      *\n"
+        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+        "* {:<10} {:>4}      {:<10} {:>4}          *\n"
+        "* {:<10} {:>4}                               *\n"
+        "*************************************************\n",
+        "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
+        "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
+        Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq);
+
+    std::cout << banner;
+}
 /// Runs the SAXS (Small-Angle X-ray Scattering) analysis on a range of frames.
 ///
 /// This function creates a vector of frame indices to process, and then iterates over each frame.
@@ -40,7 +56,6 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 /// @param dt The step size between frames.
 void RunSaxs::Run(int beg, int end, int dt)
 {
-    std::cout << "Running SAXS" << Options::nx << ::endl;
     auto args = createVector(beg, end, dt);
     py::scoped_interpreter guard{}; // Start the interpreter and keep it alive for this scope
     std::string result;
@@ -68,7 +83,8 @@ void RunSaxs::Run(int beg, int end, int dt)
     auto start = std::chrono::high_resolution_clock::now();
     saxsKernel myKernel(Options::nx, Options::ny, Options::nz, Options::order);
     myKernel.setnpx(8);
-    myKernel.createMemory(Options::nnx, Options::nny, Options::nnz, Options::sigma);
+    myKernel.createMemory(Options::nnx, Options::nny, Options::nnz, Options::sigma, Options::Dq);
+    this->writeBanner();
 
     for (auto frame : args)
     {
@@ -90,6 +106,13 @@ void RunSaxs::Run(int beg, int end, int dt)
         {
             std::cerr << "Python error: " << e.what() << std::endl;
         }
+    }
+    auto myhisto = myKernel.getSaxs();
+    std::ofstream myfile;
+    myfile.open("saxs.dat");
+    for (auto data : myhisto)
+    {
+        myfile << data[0] << " " << data[1] << std::endl;
     }
     std::cout << "Done " << args.size() << std::endl;
     auto end0 = std::chrono::high_resolution_clock::now();
