@@ -28,22 +28,6 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 
     return result;
 }
-void RunSaxs::writeBanner()
-{
-    std::string banner = fmt::format(
-        "*************************************************\n"
-        "* {:^40}      *\n"
-        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
-        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
-        "* {:<10} {:>4}      {:<10} {:>4}          *\n"
-        "* {:<10} {:>4}                               *\n"
-        "*************************************************\n",
-        "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
-        "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
-        Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq);
-
-    std::cout << banner;
-}
 /// Runs the SAXS (Small-Angle X-ray Scattering) analysis on a range of frames.
 ///
 /// This function creates a vector of frame indices to process, and then iterates over each frame.
@@ -83,15 +67,13 @@ void RunSaxs::Run(int beg, int end, int dt)
     auto start = std::chrono::high_resolution_clock::now();
     saxsKernel myKernel(Options::nx, Options::ny, Options::nz, Options::order);
     myKernel.setnpx(8);
-    myKernel.createMemory(Options::nnx, Options::nny, Options::nnz, Options::sigma, Options::Dq);
-    this->writeBanner();
-
+    myKernel.scaledCell();
     for (auto frame : args)
     {
 
         try
         {
-            std::cout << "Frame: " << frame << std::endl;
+            float simTime = analyzer.attr("get_time")(frame).cast<py::float_>();
             py::object dims = analyzer.attr("get_dimensions_frame")(frame);
             auto box_dimensions = dims.cast<std::vector<float>>();
             Cell::calculateMatrices(box_dimensions);
@@ -100,7 +82,7 @@ void RunSaxs::Run(int beg, int end, int dt)
             py::object coords_obj = analyzer.attr("get_centered_frame")(frame);
             std::vector<std::vector<float>> coords = coords_obj.cast<std::vector<std::vector<float>>>();
 
-            myKernel.runPKernel(coords, index_map, oc);
+            myKernel.runPKernel(frame, simTime, coords, index_map, oc);
         }
 
         catch (const py::error_already_set &e)
@@ -115,11 +97,11 @@ void RunSaxs::Run(int beg, int end, int dt)
     {
         myfile << data[0] << " " << data[1] << std::endl;
     }
-    std::cout << "Done " << args.size() << std::endl;
+    std::cout << "Done " << args.size() << " Steps " << std::endl;
     auto end0 = std::chrono::high_resolution_clock::now();
 
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end0 - start);
 
-    std::cout << "Elapsed time: " << duration_ms.count() / (float)args.size() << " milliseconds\n";
+    std::cout << "Elapsed time per step: " << duration_ms.count() / (float)args.size() << " milliseconds\n";
 };
 RunSaxs::~RunSaxs() {};

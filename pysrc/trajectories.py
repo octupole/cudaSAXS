@@ -151,7 +151,10 @@ class TrajectoryStructures:
             atoms2=atom.index
             atom_index[atom_type].append(atoms2)
         return atom_index            
-        
+
+    def get_time(self, frame):
+        return self.universe.trajectory[frame].time
+    
     def get_atom_coordinates(self, frame):
         """
         Returns the coordinates for each atom type found in the specified frame in dictionary format.
@@ -160,7 +163,6 @@ class TrajectoryStructures:
         atom_coords = []
             
         atom_coords=self.universe.atoms.positions
-
         return atom_coords
     
     def write_pdb(self, frame, output_filename):

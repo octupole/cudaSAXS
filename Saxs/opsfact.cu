@@ -28,7 +28,7 @@ __host__ __device__ void opsfact::allocate(float *d_v0)
  */
 __host__ __device__ float opsfact::operator()(float q1)
 {
-    float q = q1 / (4.0 * M_PI * 10.0);
+    float q = q1 / (4.0 * M_PI);
     float q2 = q * q;
     float result = d * (v[0] * expf(-v[4] * q2) + v[1] * expf(-v[5] * q2) + v[2] * expf(-v[6] * q2) + v[3] * expf(-v[7] * q2) + v[8]);
     return result;

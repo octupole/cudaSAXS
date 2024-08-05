@@ -6,7 +6,7 @@
 #include <cuComplex.h>
 // Kernel to calculate |K| values and populate the histogram
 __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
-                                    float bin_size, int num_bins)
+                                    float bin_size, float qcut, int num_bins)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -32,22 +32,29 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         mw3 = oc[ZZ * DIM + XX] * ia + oc[ZZ * DIM + YY] * ja + oc[ZZ * DIM + ZZ] * ka;
         mw3 = 2.0 * M_PI * mw3;
         mw = sqrtf(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
-        if (mw > 3.0)
+        if (mw > qcut)
             return;
-        int bin = static_cast<int>(mw / bin_size);
-        if (bin < num_bins)
+        int h0 = static_cast<int>(mw / bin_size);
+        int h1 = h0 + 1;
+        cuFloatComplex v0;
+        if (h0 < num_bins)
         {
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            auto v0 = d_array[idx];
+            v0 = d_array[idx];
             if (k != 0 && k != npz - 1)
             {
                 auto v1 = d_array[idbx];
                 v0 = cuCaddf(v0, v1);
                 v0 = cuCmulf(v0, make_cuFloatComplex(0.5f, 0.0f));
             }
-            atomicAdd(&d_histogram[bin], cuCrealf(v0));
-            atomicAdd(&d_nhist[bin], 1.0f);
+            atomicAdd(&d_histogram[h0], cuCrealf(v0));
+            atomicAdd(&d_nhist[h0], 1.0f);
+            if (h0 != 0)
+            {
+                atomicAdd(&d_histogram[h1], cuCrealf(v0));
+                atomicAdd(&d_nhist[h1], 1.0f);
+            }
         }
     }
 }
@@ -81,11 +88,9 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
         float bsp_j = modX[j];
         float bsp_k = modX[k];
         float bsp_ijk = bsp_i * bsp_j * bsp_k / (float)numParticles;
-
         cuFloatComplex bsp = make_cuComplex(bsp_ijk, 0.0f);
-        cuFloatComplex product = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
-
-        grid_q[idx] = cuCmulf(product, bsp);
+        grid_q[idx] = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
+        grid_q[idx] = cuCmulf(grid_q[idx], bsp);
     }
 }
 /**
@@ -103,7 +108,7 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
  * @param nnz The number of grid points in the z-dimension.
  */
 __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
-                              float *Scatter, int nnx, int nny, int nnz)
+                              float *Scatter, int nnx, int nny, int nnz, float qcut)
 {
 
     // if (idx >= nx0 * ny0 * (nz0 / 2 + 1))
@@ -131,6 +136,8 @@ __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, f
         mw2 = 2.0 * M_PI * mw2;
         mw3 = 2.0 * M_PI * mw3;
         mw = sqrt(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
+        if (mw > qcut)
+            return;
         cuFloatComplex fq = make_cuComplex(ff(mw), 0.0f);
         cuFloatComplex mult = cuCmulf(fq, grid_q[idx]);
         grid_oq[idx] = cuCaddf(grid_oq[idx], mult);
@@ -244,10 +251,14 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
  */
 __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens, int nx, int ny, int nz, int nnx, int nny, int nnz)
 {
+    float N1 = (float)nnx / (float)nx;
+    float N2 = (float)nny / (float)ny;
+    float N3 = (float)nnz / (float)nz;
 
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
+    float summ0 = -myDens * (N1 * N2 * N3 - 1.0) / (N1 * N2 * N3);
     if (x < nnx && y < nny && z < nnz)
     {
         int idx_s = z + y * nnz + x * nnz * nny;
@@ -257,6 +268,7 @@ __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens
             int idx = z + y * nz + x * nz * ny;
             d_gridSup[idx_s] = d_grid[idx];
         }
+        d_gridSup[idx_s] += summ0;
     }
 }
 
@@ -306,16 +318,23 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
  * @param index_map A map of particle indices, where the keys are particle types and the values are vectors of indices.
  * @param oc The orientation matrix.
  */
-void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map, std::vector<std::vector<float>> &oc)
+void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map, std::vector<std::vector<float>> &oc)
 {
+    static bool firstTime = true;
     // Cudaevents
+
+    // to compute average density on the border
+    if (firstTime)
+    {
+        this->resetHistogramParameters(oc);
+        this->createMemory();
+        this->writeBanner();
+    }
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaEventRecord(start);
-
-    // to compute average density on the border
     int mx = borderBins(nx, SHELL);
     int my = borderBins(ny, SHELL);
     int mz = borderBins(nz, SHELL);
@@ -324,7 +343,9 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     thrust::host_vector<float> h_oc(DIM * DIM);
     for (int i = 0; i < DIM; ++i)
         for (int j = 0; j < DIM; ++j)
+        {
             h_oc[i * DIM + j] = mySigma * oc[i][j];
+        }
 
     thrust::device_vector<float> d_oc = h_oc;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
@@ -346,6 +367,11 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     zeroDensityKernel<<<numBlocksGridSuperAcc, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_gridSupAcc.size());
 
     int totParticles = 0;
+    std::string formatted_string = fmt::format("--> Frame: {:<7}  Time Step: {:.2f} fs", frame, Time);
+
+    // Print the formatted string
+    std::cout << formatted_string << std::endl;
+
     for (const auto &pair : index_map)
     {
         cufftHandle plan;
@@ -364,7 +390,6 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
 
         this->numParticles = Particles.size();
         totParticles += this->numParticles;
-
         // Allocate and copy particles to the device
         thrust::host_vector<float> h_particles(numParticles * 3);
         for (int i = 0; i < numParticles; ++i)
@@ -382,6 +407,8 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         float *d_scatter_ptr = thrust::raw_pointer_cast(d_scatter.data());
 
         int numBlocks = (numParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+        //    Kernels launch for the rhoKernel
 
         zeroDensityKernel<<<numBlocksGrid, THREADS_PER_BLOCK>>>(d_grid_ptr, d_grid.size());
 
@@ -402,6 +429,7 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         // zeroes the Sup density grid
         zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
         cudaDeviceSynchronize();
+
         superDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
 
         // Synchronize the device
@@ -411,16 +439,14 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
         cudaDeviceSynchronize();
 
         // Synchronize the device
-        scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz);
+        scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz, kcut);
         cudaDeviceSynchronize();
     }
-
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
-
     // // Synchronize the device
     cudaDeviceSynchronize();
     calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
-                                               bin_size, num_bins);
+                                               bin_size, kcut, num_bins);
 
     cudaDeviceSynchronize();
     cudaEventRecord(stop);
@@ -429,11 +455,12 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
     // Calculate the elapsed time in milliseconds
     float gpuElapsedTime;
     cudaEventElapsedTime(&gpuElapsedTime, start, stop);
-    std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
+    // std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
 
     // Destroy the events
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
+    firstTime = false;
 }
 std::vector<std::vector<float>> saxsKernel::getSaxs()
 {
@@ -465,33 +492,22 @@ std::vector<std::vector<float>> saxsKernel::getSaxs()
  * @param[in,out] nnz The optimal z-dimension of the super-grid.
  * @param[in] sigma The sigma value used to calculate the optimal grid sizes.
  */
-void saxsKernel::createMemory(int &nnx, int &nny, int &nnz, float sigma, float Dq)
+void saxsKernel::createMemory()
 {
-    this->sigma = sigma;
-    if (nnx == 0)
-    {
-        nnx = this->nnx = static_cast<int>(findClosestProduct(nx, sigma));
-        nny = this->nny = static_cast<int>(findClosestProduct(ny, sigma));
-        nnz = this->nnz = static_cast<int>(findClosestProduct(nz, sigma));
-    }
-    else
-    {
-        this->nnx = nnx;
-        this->nny = nny;
-        this->nnz = nnz;
-    }
-
     size_t nnpz = nnz / 2 + 1;
-    this->bin_size = Dq;
-    int max_k = 20.0f;
-    this->num_bins = static_cast<int>(max_k / bin_size) + 1;
+
+    this->bin_size = Options::Dq;
+    this->kcut = Options::Qcut;
+
+    this->num_bins = static_cast<int>(kcut / bin_size) + 1;
     thrust::host_vector<float> h_histogram(num_bins, 0.0f);
     thrust::host_vector<float> h_nhist(num_bins, 0.0f);
+
     d_histogram = h_histogram;
     d_nhist = h_nhist;
     d_histogram_ptr = thrust::raw_pointer_cast(d_histogram.data());
     d_nhist_ptr = thrust::raw_pointer_cast(d_nhist.data());
-    BSpline::BSpmod *bsp_modx = new BSpline::BSpmod(nx, ny, nz);
+    BSpline::BSpmod *bsp_modx = new BSpline::BSpmod(nnx, nny, nnz);
 
     thrust::host_vector<float> h_moduleX = bsp_modx->ModX();
     thrust::host_vector<float> h_moduleY = bsp_modx->ModY();
@@ -566,7 +582,7 @@ std::vector<long long> saxsKernel::generateMultiples(long long limit)
  * @return The closest integer to N * sigma that is obtainable by multiplying only 2, 3, 5, and 7.
  */
 // Function to find the closest integer to N * sigma that is obtainable by multiplying only 2, 3, 5, and 7
-long long saxsKernel::findClosestProduct(int n, double sigma)
+long long saxsKernel::findClosestProduct(int n, float sigma)
 {
     long long target = std::round(n * sigma);
     long long limit = target * 2; // A generous limit for generating multiples
@@ -586,6 +602,79 @@ long long saxsKernel::findClosestProduct(int n, double sigma)
     }
 
     return closest;
+}
+void saxsKernel::scaledCell()
+{
+    sigma = Options::sigma;
+    if (Options::nnx == 0)
+    {
+        nnx = this->nnx = static_cast<int>(findClosestProduct(nx, sigma));
+        nny = this->nny = static_cast<int>(findClosestProduct(ny, sigma));
+        nnz = this->nnz = static_cast<int>(findClosestProduct(nz, sigma));
+        Options::nnx = nnx;
+        Options::nny = nny;
+        Options::nnz = nnz;
+    }
+    else
+    {
+        this->nnx = Options::nnx;
+        this->nny = Options::nny;
+        this->nnz = Options::nnz;
+    }
+}
+void saxsKernel::resetHistogramParameters(std::vector<std::vector<float>> &oc)
+{
+
+    auto qcut = Options::Qcut;
+    auto dq = Options::Dq;
+    int nfx{(nnx % 2 == 0) ? nnx / 2 : nnx / 2 + 1};
+    int nfy{(nny % 2 == 0) ? nny / 2 : nny / 2 + 1};
+    int nfz{(nnz % 2 == 0) ? nnz / 2 : nnz / 2 + 1};
+    float argx{2.0f * (float)M_PI * oc[XX][XX] / sigma};
+    float argy{2.0f * (float)M_PI * oc[YY][YY] / sigma};
+    float argz{2.0f * (float)M_PI * oc[ZZ][ZZ] / sigma};
+
+    std::vector<float> fx{(float)nfx - 1, (float)nfy - 1, (float)nfz - 1};
+
+    vector<float> mydq0 = {argx, argy, argz, dq};
+    vector<float> mycut0 = {argx * fx[XX], argy * fx[YY], argz * fx[ZZ], qcut};
+
+    dq = (*std::max_element(mydq0.begin(), mydq0.end()));
+    qcut = *std::min_element(mycut0.begin(), mycut0.end());
+    if (qcut != Options::Qcut)
+    {
+        std::string formatted_string = fmt::format("----- Qcut had to be reset to {:.2f} from  {:.2f} ----", qcut, Options::Qcut);
+        std::cout << "\n--------------------------------------------------\n";
+        std::cout << formatted_string << "\n";
+        std::cout << "--------------------------------------------------\n\n";
+
+        Options::Qcut = qcut;
+    }
+    if (dq != Options::Dq)
+    {
+        std::string formatted_string = fmt::format("----- Dq had to be reset to {:.3f} from  {:.3f} ----", dq, Options::Dq);
+        std::cout << "\n--------------------------------------------------\n";
+        std::cout << formatted_string << "\n";
+        std::cout << "--------------------------------------------------\n\n";
+
+        Options::Dq = dq;
+    }
+}
+void saxsKernel::writeBanner()
+{
+    std::string banner = fmt::format(
+        "*************************************************\n"
+        "* {:^40}      *\n"
+        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+        "* {:<10} {:>4}      {:<10} {:>4}          *\n"
+        "* {:<10} {:>4.3f}     {:<10} {:>2.f}      *\n"
+        "*************************************************\n\n",
+        "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
+        "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
+        Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq, "Q Cutoff ", Options::Qcut);
+
+    std::cout << banner;
 }
 
 saxsKernel::~saxsKernel()

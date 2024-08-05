@@ -22,6 +22,9 @@
 #include <limits>
 #include <functional>
 #include <map>
+#include "Ftypedefs.h"
+#include <fmt/core.h>
+
 #pragma once
 
 class saxsKernel
@@ -40,8 +43,8 @@ public:
         npy = _npx;
         npz = _npx;
     }
-    void runPKernel(std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
-    void createMemory(int &, int &, int &, float sigma, float Dq);
+    void runPKernel(int, float, std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
+    void scaledCell();
 
     std::vector<std::vector<float>> getSaxs();
 
@@ -55,7 +58,10 @@ private:
     int numParticles;
     float sigma;
     float bin_size;
+    float kcut;
+    float dk;
     int num_bins;
+
     thrust::device_vector<float> d_moduleX;
     thrust::device_vector<float> d_moduleY;
     thrust::device_vector<float> d_moduleZ;
@@ -86,21 +92,24 @@ private:
     float *d_moduleZ_ptr{nullptr};
     float *d_histogram_ptr{nullptr};
     float *d_nhist_ptr{nullptr};
-    std::function<int(int, double)> borderBins = [](int nx, double shell) -> int
+    void writeBanner();
+    std::function<int(int, float)> borderBins = [](int nx, float shell) -> int
     {
         return static_cast<int>(shell * nx / 2);
     };
 
+    void createMemory();
+    void resetHistogramParameters(std::vector<std::vector<float>> &);
     std::vector<long long> generateMultiples(long long limit);
-    long long findClosestProduct(int n, double sigma);
+    long long findClosestProduct(int n, float sigma);
     friend __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *nhist, float *oc, int nx, int ny, int nz,
-                                               float bin_size, int num_bins);
+                                               float bin_size, float Qcut, int num_bins);
 
     friend __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
                                          int numParticles, int nnx, int nny, int nnz);
 
     friend __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
-                                         float *Scatter, int nnx, int nny, int nnz);
+                                         float *Scatter, int nnx, int nny, int nnz, float Qcut);
     friend __global__ void rhoKernel(float *xa, float *grid, int order,
                                      int numParticles, int nx, int ny, int nz);
     friend __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens,
