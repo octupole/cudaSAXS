@@ -102,21 +102,6 @@ private:
     void resetHistogramParameters(std::vector<std::vector<float>> &);
     std::vector<long long> generateMultiples(long long limit);
     long long findClosestProduct(int n, float sigma);
-    friend __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *nhist, float *oc, int nx, int ny, int nz,
-                                               float bin_size, float Qcut, int num_bins);
-
-    friend __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
-                                         int numParticles, int nnx, int nny, int nnz);
-
-    friend __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
-                                         float *Scatter, int nnx, int nny, int nnz, float Qcut);
-    friend __global__ void rhoKernel(float *xa, float *grid, int order,
-                                     int numParticles, int nx, int ny, int nz);
-    friend __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens,
-                                              int nx, int ny, int nz, int nnx, int nny, int nnz);
-    friend __global__ void zeroDensityKernel(float *d_grid, int size);
-    friend __global__ void zeroDensityKernel(cuFloatComplex *d_grid, size_t size);
-    friend __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int dy, int dz, float *Dens, int *count);
 };
 
 #endif
