@@ -310,10 +310,10 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
 {
     // Cudaevents
 
-    // cudaEvent_t start, stop;
-    // cudaEventCreate(&start);
-    // cudaEventCreate(&stop);
-    // cudaEventRecord(start);
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start);
 
     // to compute average density on the border
     int mx = borderBins(nx, SHELL);
@@ -406,70 +406,34 @@ void saxsKernel::runPKernel(std::vector<std::vector<float>> &coords, std::map<st
 
         // Synchronize the device
         cudaDeviceSynchronize();
-        // if (type == "H")
-        // {
-        //     auto idx = [&](int i, int j, int k)
-        //     { int npz=nz/2+1; return i * ny * npz + j * npz + k; };
-
-        //     h_gridSup = d_gridSup;
-        //     std::cout << type << " Grid size:  " << cuCrealf(h_sup[idx(10, 4, 7)]) << std::endl;
-        // }
-        // if (type == "H")
-        // {
-        //     int x{0}, y{0}, z{0};
-
-        //     h_gridSup = d_gridSup;
-        //     h_grid = d_grid;
-        //     int idx_s = z + y * nnz + x * nnz * nny;
-        //     int idx = z + y * nz + x * nz * ny;
-        //     printf(" %d %d %f %f \n", idx_s, idx, h_gridSup[idx_s], myDens);
-        // }
 
         cufftExecR2C(plan, d_gridSup_ptr, d_gridSupC_ptr);
         cudaDeviceSynchronize();
+
         // Synchronize the device
         scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz);
         cudaDeviceSynchronize();
     }
 
-    // // Synchronize the device
-    // cudaDeviceSynchronize();
-    {
-        auto idx = [&](int i, int j, int k)
-        { int nnpz=(nnz/2+1); return i * nny * nnpz + j * nnpz + k; };
-
-        h_gridSupAcc = d_gridSupAcc;
-
-        std::cout << "before Mod i" << " Grid size: r  " << cuCrealf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
-        std::cout << "before Mod c" << " Grid size: i " << cuCimagf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
-    }
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
-    {
-        auto idx = [&](int i, int j, int k)
-        { int nnpz=(nnz/2+1); return i * nny * nnpz + j * nnpz + k; };
-
-        h_gridSupAcc = d_gridSupAcc;
-
-        std::cout << "after Mod i" << " Grid size: r  " << cuCrealf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
-        std::cout << "after Mod c" << " Grid size: i " << cuCimagf(h_gridSupAcc[idx(10, 4, 3)]) << std::endl;
-    }
 
     // // Synchronize the device
     cudaDeviceSynchronize();
     calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                bin_size, num_bins);
 
-    // cudaDeviceSynchronize();
-    // cudaEventRecord(stop);
-    // cudaEventSynchronize(stop);
+    cudaDeviceSynchronize();
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
 
-    // // Calculate the elapsed time in milliseconds
-    // float gpuElapsedTime;
-    // cudaEventElapsedTime(&gpuElapsedTime, start, stop);
+    // Calculate the elapsed time in milliseconds
+    float gpuElapsedTime;
+    cudaEventElapsedTime(&gpuElapsedTime, start, stop);
+    std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
 
-    // // Destroy the events
-    // cudaEventDestroy(start);
-    // cudaEventDestroy(stop);
+    // Destroy the events
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 }
 std::vector<std::vector<float>> saxsKernel::getSaxs()
 {

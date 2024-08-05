@@ -99,6 +99,7 @@ void RunSaxs::Run(int beg, int end, int dt)
             auto oc = Cell::getOC();
             py::object coords_obj = analyzer.attr("get_centered_frame")(frame);
             std::vector<std::vector<float>> coords = coords_obj.cast<std::vector<std::vector<float>>>();
+
             myKernel.runPKernel(coords, index_map, oc);
         }
 
@@ -117,14 +118,8 @@ void RunSaxs::Run(int beg, int end, int dt)
     std::cout << "Done " << args.size() << std::endl;
     auto end0 = std::chrono::high_resolution_clock::now();
 
-    auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end0 - start);
-    auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end0 - start);
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end0 - start);
-    auto duration_sec = std::chrono::duration_cast<std::chrono::seconds>(end0 - start);
 
-    std::cout << "Elapsed time: " << duration_ns.count() / (float)args.size() << " nanoseconds\n";
-    std::cout << "Elapsed time: " << duration_us.count() / (float)args.size() << " microseconds\n";
     std::cout << "Elapsed time: " << duration_ms.count() / (float)args.size() << " milliseconds\n";
-    std::cout << "Elapsed time: " << duration_sec.count() / (float)args.size() << " seconds\n";
 };
 RunSaxs::~RunSaxs() {};
