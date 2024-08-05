@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD 14)
 # Find Python and pybind11
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/opt/anaconda3/envs/cudasaxs/share/cmake/pybind11")
 find_package(pybind11 REQUIRED)
 
 
@@ -61,5 +62,7 @@ target_link_libraries(cudaSAXS cudaKernels exec saxs system utils ${CUDA_LIBRARI
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages
+message(STATUS "Python3 Include Directories: ${Python3_INCLUDE_DIRS}")
+message(STATUS "pybind11 Include Directories: ${pybind11_INCLUDE_DIRS}")
 message(STATUS "CUDA Include Directories: ${CUDA_INCLUDE_DIRS}")
 message(STATUS "CUDA Library Directories: ${CUDA_TOOLKIT_ROOT_DIR}/lib64")
