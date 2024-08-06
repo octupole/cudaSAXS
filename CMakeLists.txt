@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5...3.20)
 #list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
-project(cudaSAXS LANGUAGES CXX CUDA)
+project(cudaSAXS LANGUAGES CXX C CUDA)
 # Specify the CUDA and C++ standard
 set(CMAKE_CXX_STANDARD 14)
 
@@ -30,6 +30,7 @@ include_directories("${PROJECT_SOURCE_DIR}/Saxs")
 include_directories("${PROJECT_SOURCE_DIR}/Utilities")
 include_directories("${PROJECT_SOURCE_DIR}/Exec")
 include_directories("${PROJECT_SOURCE_DIR}/fmt/include")
+include_directories("${PROJECT_SOURCE_DIR}/xdr/include")
 # Include directories for Python3 and Pybind11
 include_directories(${Python3_INCLUDE_DIRS})
 include_directories(${pybind11_INCLUDE_DIRS})
@@ -47,6 +48,7 @@ add_subdirectory(Utilities)
 add_subdirectory(System)
 add_subdirectory(cudaKernels)
 add_subdirectory(Saxs)
+add_subdirectory(xdr)
 add_subdirectory(Exec)
 
 # Specify the target executable
