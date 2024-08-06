@@ -60,7 +60,7 @@ target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT
 set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries
-target_link_libraries(cudaSAXS cudaKernels exec saxs system utils ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
+target_link_libraries(cudaSAXS cudaKernels exec saxs system utils xdrfile ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages

@@ -34,7 +34,8 @@ namespace Units
 				 unitefield = unitepot * lbohr,
 				 unitfield = elechg / unitl / (4.0 * pi * epso),
 				 unit_mm = avogad * (elechg * elechg / (epso * unitl) / 1000.0),
-				 kT300 = gascon * 300.0 / 1000.0;
+				 kT300 = gascon * 300.0 / 1000.0,
+				 nanoToA = 10.0;
 }
 
 #endif /* PARAMETERS_H_ */
