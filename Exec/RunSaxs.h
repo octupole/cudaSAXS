@@ -13,9 +13,9 @@
 #include <algorithm>
 #include <numeric>
 #include <chrono>
-#include "Atoms.h"
 #include "Options.h"
 #include "saxsKernel.h"
+#include "Cell.h"
 
 #pragma once
 namespace py = pybind11;
@@ -31,7 +31,6 @@ public:
 private:
     std::string tpr_file, xtc_file;
     std::vector<int> createVector(int, int, int);
-    std::vector<Atoms> atoms;
 };
 
 #endif

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import argparse
 import MDAnalysis as mda
+from MDAnalysis.lib.formats.libmdaxdr import XTCFile
 import networkx as nx
 import sys
 import numpy as np
@@ -8,7 +9,7 @@ import time
 import warnings
         
 class Topology:
-    def __init__(self, tpr_file):
+    def __init__(self, tpr_file,xtc_file):
         """
         Initializes the MoleculeCounter with the given TPR and XTC files.
         """
@@ -23,6 +24,7 @@ class Topology:
         self.other_molecules = []
         self.__build_graph()
         self.__classify_molecules()
+        self.xtc=XTCFile(xtc_file)
         print("Initialized Topology")
 
     def __build_graph(self):
@@ -108,6 +110,24 @@ class Topology:
             atoms2=atom.index
             atom_index[atom_type].append(atoms2)
         return atom_index            
+    
+    def read_frame(self,frame_number):
+        self.xtc.seek(frame_number)
+        self.frame=self.xtc.read()
+    
+    def get_box(self):
+        return self.frame.box
+    
+    def get_step(self):
+        return self.frame.step
+    
+    def get_time(self):
+        return self.frame.time
+
+    def get_coordinates(self):
+        return self.frame.x 
+    
+        
 
 def main():
     """
@@ -115,17 +135,18 @@ def main():
     """
     parser = argparse.ArgumentParser(description='Read TPR and XTC files and count the number of molecules in the system.')
     parser.add_argument('-s', '--tpr', type=str, help='Path to the TPR file')
+    parser.add_argument('-x', '--xtc', type=str, help='Path to the XTC file')
     parser.add_argument('-o', '--output', type=str, help='Output PDB file', default='centered_structure.pdb')
 
     args = parser.parse_args()
     
     # Check if both arguments are provided
-    if not args.tpr:
-        parser.error("TPR file file must be provided.")
+    if not args.tpr or not args.xtc:
+        parser.error("XTC and TPR file file must be provided.")
         sys.exit(1)
 
     # Initialize MoleculeCounter and count molecules
-    top = Topology(args.tpr, args.pdb)
+    top = Topology(args.tpr, args.xtc)
     
     ( num_molecules, num_proteins, num_waters, num_ions, num_others) = top.count_molecules()
 
@@ -138,7 +159,24 @@ def main():
         print(f'Number of other molecules: {num_others}')
         
     atom_indesx=top.get_atom_index()
-    print(atom_indesx)
+    top.read_frame(10)
+    box=top.get_box()
+    print(top.frame.box[0])    
+    # for i in range(0,200,20):
+    #     print(i)
+    #     top.read_frame(i)
+    #     box=top.get_box()
+    #     print(box)
+    #     print(top.get_step())
+    #     print(top.get_time())
+    # o=0
+    # for frame in top.xtc:
+    #     if o !=0 and o%20 == 0:
+    #         print(frame.box, frame.time, frame.step)
+    #     if o>200:
+    #         break
+    #     o+=1
+    
 
     # # Generate and print the molecule dictionary
     # molecule_dict = traj.generate_molecule_dict()

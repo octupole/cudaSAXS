@@ -40,6 +40,14 @@ std::vector<int> RunSaxs::createVector(int start, int end, int step)
 /// @param dt The step size between frames.
 void RunSaxs::Run(int beg, int end, int dt)
 {
+    auto NToA = [](std::vector<std::vector<float>> &vec)
+    {
+        for (auto &row : vec)
+        {
+            for (auto &col : row)
+                col = col * 10.0f;
+        };
+    };
     auto args = createVector(beg, end, dt);
     py::scoped_interpreter guard{}; // Start the interpreter and keep it alive for this scope
     std::string result;
@@ -50,10 +58,10 @@ void RunSaxs::Run(int beg, int end, int dt)
     // Set up the arguments to pass to the Python script
 
     // Load the Python script
-    py::module_ script = py::module_::import("trajectories");
+    py::module_ script = py::module_::import("topology");
 
     // Create a StructureCentering instance (adjust arguments as needed)
-    py::object trajStructure = script.attr("TrajectoryStructures");
+    py::object trajStructure = script.attr("Topology");
     py::object analyzer = trajStructure(tpr_file, xtc_file);
     py::dict gather_dict = analyzer.attr("get_atom_index")();
     for (auto item : gather_dict)
@@ -73,15 +81,16 @@ void RunSaxs::Run(int beg, int end, int dt)
 
         try
         {
-            float simTime = analyzer.attr("get_time")(frame).cast<py::float_>();
-            py::object dims = analyzer.attr("get_dimensions_frame")(frame);
-            auto box_dimensions = dims.cast<std::vector<float>>();
+            analyzer.attr("read_frame")(frame);
+            float simTime = analyzer.attr("get_time")().cast<py::float_>();
+            py::object coords_obj = analyzer.attr("get_coordinates")();
+            auto coords = analyzer.attr("get_coordinates")().cast<std::vector<std::vector<float>>>();
+            NToA(coords);
+            auto box_dimensions = analyzer.attr("get_box")().cast<std::vector<std::vector<float>>>();
+
             Cell::calculateMatrices(box_dimensions);
             auto co = Cell::getCO();
             auto oc = Cell::getOC();
-            py::object coords_obj = analyzer.attr("get_centered_frame")(frame);
-            std::vector<std::vector<float>> coords = coords_obj.cast<std::vector<std::vector<float>>>();
-
             myKernel.runPKernel(frame, simTime, coords, index_map, oc);
         }
 
@@ -98,6 +107,7 @@ void RunSaxs::Run(int beg, int end, int dt)
         myfile << data[0] << " " << data[1] << std::endl;
     }
     std::cout << "Done " << args.size() << " Steps " << std::endl;
+    myfile.close();
     auto end0 = std::chrono::high_resolution_clock::now();
 
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end0 - start);

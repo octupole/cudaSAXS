@@ -108,3 +108,19 @@ void Cell::calculateMatrices(
         {(-cosGamma) / (a * sinGamma), 1.0f / (b * sinGamma), 0.0f},
         {b * c * (cosAlpha * cosGamma - cosBeta) / V, a * c * (cosBeta * cosGamma - cosAlpha) / V, a * b * sinGamma / V}};
 }
+void Cell::calculateMatrices(std::vector<std::vector<float>> &cell_parameters)
+{
+    for (auto o{0}; o < DIM; o++)
+        for (auto p{0}; p < DIM; p++)
+            co[o][p] = 10.0f * cell_parameters[o][p];
+
+    // Calculate the inverse elements
+    oc[0][0] = 1.0 / co[0][0];
+    oc[0][1] = -co[0][1] / (co[0][0] * co[1][1]);
+    oc[0][2] = (co[0][1] * co[1][2] - co[0][2] * co[1][1]) / (co[0][0] * co[1][1] * co[2][2]);
+
+    oc[1][1] = 1.0 / co[1][1];
+    oc[1][2] = -co[1][2] / (co[1][1] * co[2][2]);
+
+    oc[2][2] = 1.0 / co[2][2];
+}

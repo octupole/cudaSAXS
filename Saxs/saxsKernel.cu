@@ -4,6 +4,13 @@
 #include "opsfact.h"
 #include <cuda_runtime.h> // Include CUDA runtime header
 #include <cuComplex.h>
+
+#include <cufft.h>
+#include <cuComplex.h>
+#include <cuda_runtime.h>
+#include "Splines.h"
+#include "Ftypedefs.h"
+#include "opsfact.h"
 #include "saxsDeviceKernels.cuh"
 
 // Kernel to calculate |K| values and populate the histogram
@@ -47,7 +54,6 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         {
             h_oc[i * DIM + j] = mySigma * oc[i][j];
         }
-
     thrust::device_vector<float> d_oc = h_oc;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
 
@@ -100,7 +106,6 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
             h_particles[i * 3 + 1] = oc[YY][XX] * Particles[i][XX] + oc[YY][YY] * Particles[i][YY] + oc[YY][ZZ] * Particles[i][ZZ];
             h_particles[i * 3 + 2] = oc[ZZ][XX] * Particles[i][XX] + oc[ZZ][YY] * Particles[i][YY] + oc[ZZ][ZZ] * Particles[i][ZZ];
         }
-
         thrust::device_vector<float> d_particles = h_particles;
         thrust::host_vector<float> h_scatter = Scattering::getScattering(type);
         thrust::device_vector<float> d_scatter = h_scatter;
@@ -113,7 +118,8 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         //    Kernels launch for the rhoKernel
 
         zeroDensityKernel<<<numBlocksGrid, THREADS_PER_BLOCK>>>(d_grid_ptr, d_grid.size());
-
+        cudaDeviceSynchronize();
+        // Check for errors
         rhoKernel<<<numBlocks, THREADS_PER_BLOCK>>>(d_particles_ptr, d_grid_ptr, order,
                                                     numParticles, nx, ny, nz);
 
@@ -147,6 +153,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     }
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
     // // Synchronize the device
+
     cudaDeviceSynchronize();
     calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                bin_size, kcut, num_bins);
@@ -158,7 +165,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // Calculate the elapsed time in milliseconds
     float gpuElapsedTime;
     cudaEventElapsedTime(&gpuElapsedTime, start, stop);
-    // std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
+    std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
 
     // Destroy the events
     cudaEventDestroy(start);
@@ -327,7 +334,7 @@ void saxsKernel::scaledCell()
 }
 void saxsKernel::resetHistogramParameters(std::vector<std::vector<float>> &oc)
 {
-
+    using namespace std;
     auto qcut = Options::Qcut;
     auto dq = Options::Dq;
     int nfx{(nnx % 2 == 0) ? nnx / 2 : nnx / 2 + 1};

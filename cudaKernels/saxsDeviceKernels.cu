@@ -186,7 +186,6 @@ __global__ void gridSumKernel(cuFloatComplex *d_grid, size_t size, float *gridsu
 __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, int nx, int ny, int nz)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
     if (idx < numParticles)
     {
         Splines bsplineX;
@@ -216,7 +215,6 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
         spline splY = bsplineX(gy);
         spline splZ = bsplineX(gz);
         int i0 = mx - order;
-
         for (auto o = 0; o < order; o++)
         {
             int i = i0 + (nx0 - ((i0 >= 0) ? nx0 : -nx0)) / 2;

@@ -50,6 +50,7 @@ public:
             return;
         }
     };
+    static void calculateMatrices(std::vector<std::vector<float>> &cell_parameters);
 
     // Optional static accessors for pre-calculated matrices
     static const std::vector<std::vector<float>> &getCO() { return co; };
