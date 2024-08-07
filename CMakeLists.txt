@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5...3.20)
+cmake_minimum_required(VERSION 3.18)
 #list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
 project(cudaSAXS LANGUAGES CXX C CUDA)
 # Specify the CUDA and C++ standard
@@ -38,7 +38,8 @@ include_directories(${pybind11_INCLUDE_DIRS})
 link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
 # Set the CUDA architectures you want to support
-#set(CMAKE_CUDA_ARCHITECTURES 70)
+set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)  # For Pascal Volta, Turing, Ampere, Ampere and Ada Lovelace)
+
 # Enable optimization flags
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 128 -O3 -rdc=true -use_fast_math  -Xcompiler -O3")
 
