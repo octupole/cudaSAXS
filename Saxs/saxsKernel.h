@@ -45,6 +45,7 @@ public:
     }
     void runPKernel(int, float, std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
     void scaledCell();
+    double getCudaTime() { return cudaTime / cudaCalls; }
 
     std::vector<std::vector<float>> getSaxs();
 
@@ -61,7 +62,8 @@ private:
     float kcut;
     float dk;
     int num_bins;
-
+    double cudaTime{0};
+    double cudaCalls{0};
     thrust::device_vector<float> d_moduleX;
     thrust::device_vector<float> d_moduleY;
     thrust::device_vector<float> d_moduleZ;

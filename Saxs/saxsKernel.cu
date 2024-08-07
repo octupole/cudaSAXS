@@ -165,7 +165,8 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // Calculate the elapsed time in milliseconds
     float gpuElapsedTime;
     cudaEventElapsedTime(&gpuElapsedTime, start, stop);
-    std::cout << "GPU Elapsed Time: " << gpuElapsedTime << " ms" << std::endl;
+    cudaTime += gpuElapsedTime;
+    cudaCalls += 1.0;
 
     // Destroy the events
     cudaEventDestroy(start);

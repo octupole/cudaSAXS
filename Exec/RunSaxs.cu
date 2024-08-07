@@ -1,5 +1,8 @@
 #include "RunSaxs.h"
 #include <fstream>
+#include <fmt/core.h>
+#include <fmt/format.h>
+
 /// Creates a vector of integers with a specified start, end, and step.
 ///
 /// This function calculates the size of the vector based on the given start, end, and step values.
@@ -111,7 +114,22 @@ void RunSaxs::Run(int beg, int end, int dt)
     auto end0 = std::chrono::high_resolution_clock::now();
 
     auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end0 - start);
+    auto cudaTime = myKernel.getCudaTime();
+    auto totalTime = duration_ms.count() / (float)args.size();
+    auto readTime = totalTime - cudaTime;
 
-    std::cout << "Elapsed time per step: " << duration_ms.count() / (float)args.size() << " milliseconds\n";
+    std::string banner = fmt::format(
+        "\n=========================================================\n"
+        "=                                                       =\n"
+        "=                   cudaSAXS Timing                     =\n"
+        "=                                                       =\n"
+        "=           CUDA Time:     {:<10.2f} ms/per step       =\n"
+        "=           Read Time:     {:<10.2f} ms/per step       =\n"
+        "=           Total Time:    {:<10.2f} ms/per step       =\n"
+        "=                                                       =\n"
+        "=========================================================\n\n",
+        cudaTime, readTime, totalTime);
+
+    fmt::print("{}", banner);
 };
 RunSaxs::~RunSaxs() {};
