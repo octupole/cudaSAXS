@@ -61,8 +61,12 @@ int main(int argc, char *argv[])
 
     // Add optional option grid scale
     app.add_option("--Scale ", Options::sigma, "Multiplicative factor to obtained the largest scaled grid");
+
     // Add optional option grid scale
     app.add_option("--bin,--Dq ", Options::Dq, "Binsize of the histogram");
+
+    // Add optional cutoff on reciprocal space
+    app.add_option("-q,--qcut ", Options::Qcut, "Cutoff on reciprocal space");
 
     // Add help option
     app.set_help_flag("-h,--help", "Print usage");
