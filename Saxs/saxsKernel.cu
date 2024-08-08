@@ -12,7 +12,35 @@
 #include "Ftypedefs.h"
 #include "opsfact.h"
 #include "saxsDeviceKernels.cuh"
+int saxsKernel::frame_count = 0;
 
+void saxsKernel::getHistogram(std::vector<std::vector<float>> &oc)
+{
+    dim3 blockDim(npx, npy, npz);
+    dim3 gridDim((nnx + blockDim.x - 1) / blockDim.x,
+                 (nny + blockDim.y - 1) / blockDim.y,
+                 (nnz + blockDim.z - 1) / blockDim.z);
+
+    float mySigma = (float)Options::nx / (float)Options::nnx;
+
+    thrust::host_vector<float> h_oc(DIM * DIM);
+    for (int i = 0; i < DIM; ++i)
+        for (int j = 0; j < DIM; ++j)
+        {
+            h_oc[i * DIM + j] = mySigma * oc[i][j];
+        }
+    thrust::device_vector<float> d_oc = h_oc;
+    float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
+    float frames_fact = 1.0 / (float)frame_count;
+    calculate_histogram<<<gridDim, blockDim>>>(d_Iq_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
+                                               bin_size, kcut, num_bins, frames_fact);
+}
+void saxsKernel::zeroIq()
+{
+    const int THREADS_PER_BLOCK = 256;
+    int numBlocksGrid = (d_Iq.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    zeroDensityKernel<<<numBlocksGrid, THREADS_PER_BLOCK>>>(d_Iq_ptr, d_Iq.size());
+}
 // Kernel to calculate |K| values and populate the histogram
 
 /**
@@ -28,16 +56,8 @@
  */
 void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map, std::vector<std::vector<float>> &oc)
 {
-    static bool firstTime = true;
-    // Cudaevents
 
-    // to compute average density on the border
-    if (firstTime)
-    {
-        this->resetHistogramParameters(oc);
-        this->createMemory();
-        this->writeBanner();
-    }
+    // Cudaevents
 
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
@@ -69,6 +89,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     int numBlocksGridSuperC = (d_gridSupC.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     int numBlocksGridSuperAcc = (d_gridSupAcc.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     int numBlocksGridSuper = (d_gridSup.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    int numBlocksGridIq = (d_Iq.size() + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
     // zeroes the Sup density grid
     zeroDensityKernel<<<numBlocksGridSuperAcc, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_gridSupAcc.size());
@@ -81,10 +102,9 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     float N1 = (float)nnx / (float)nx;
     float N2 = (float)nny / (float)ny;
     float N3 = (float)nnz / (float)nz;
+    auto plan = this->getPlan();
     for (const auto &pair : index_map)
     {
-        cufftHandle plan;
-        cufftPlan3d(&plan, nnx, nny, nnz, CUFFT_R2C);
 
         thrust::host_vector<float> h_Dens = {0.0f};
         thrust::host_vector<int> h_count = {0};
@@ -106,6 +126,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
             h_particles[i * 3 + 1] = oc[YY][XX] * Particles[i][XX] + oc[YY][YY] * Particles[i][YY] + oc[YY][ZZ] * Particles[i][ZZ];
             h_particles[i * 3 + 2] = oc[ZZ][XX] * Particles[i][XX] + oc[ZZ][YY] * Particles[i][YY] + oc[ZZ][ZZ] * Particles[i][ZZ];
         }
+
         thrust::device_vector<float> d_particles = h_particles;
         thrust::host_vector<float> h_scatter = Scattering::getScattering(type);
         thrust::device_vector<float> d_scatter = h_scatter;
@@ -139,7 +160,6 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         cudaDeviceSynchronize();
 
         superDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
-
         // Synchronize the device
         cudaDeviceSynchronize();
 
@@ -155,8 +175,8 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // // Synchronize the device
 
     cudaDeviceSynchronize();
-    calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
-                                               bin_size, kcut, num_bins);
+
+    gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
 
     cudaDeviceSynchronize();
     cudaEventRecord(stop);
@@ -171,7 +191,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // Destroy the events
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    firstTime = false;
+    frame_count++;
 }
 std::vector<std::vector<float>> saxsKernel::getSaxs()
 {
@@ -231,20 +251,17 @@ void saxsKernel::createMemory()
     d_moduleY_ptr = thrust::raw_pointer_cast(d_moduleY.data());
     d_moduleZ_ptr = thrust::raw_pointer_cast(d_moduleZ.data());
 
-    thrust::host_vector<float> h_grid(nx * ny * nz);
-    thrust::host_vector<float> h_gridSup(nnx * nny * nnz);
-    thrust::host_vector<cuFloatComplex> h_gridSupC(nnx * nny * nnpz);
-    thrust::host_vector<cuFloatComplex> h_gridSupAcc(nnx * nny * nnpz);
-
-    d_grid = h_grid;
-    d_gridSup = h_gridSup;
-    d_gridSupC = h_gridSupC;
-    d_gridSupAcc = h_gridSupAcc;
+    d_grid.resize(nx * ny * nz);
+    d_gridSup.resize(nnx * nny * nnz);
+    d_gridSupC.resize(nnx * nny * nnpz);
+    d_gridSupAcc.resize(nnx * nny * nnpz);
+    d_Iq.resize(nnx * nny * nnpz);
 
     d_grid_ptr = thrust::raw_pointer_cast(d_grid.data());
     d_gridSup_ptr = thrust::raw_pointer_cast(d_gridSup.data());
     d_gridSupC_ptr = thrust::raw_pointer_cast(d_gridSupC.data());
     d_gridSupAcc_ptr = thrust::raw_pointer_cast(d_gridSupAcc.data());
+    d_Iq_ptr = thrust::raw_pointer_cast(d_Iq.data());
     // Do bspmod
 }
 /**

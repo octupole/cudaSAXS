@@ -6,7 +6,7 @@
 #include "opsfact.h"
 
 __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
-                                    float bin_size, float qcut, int num_bins)
+                                    float bin_size, float qcut, int num_bins, float fact)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -14,7 +14,6 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
     int npz = nz / 2 + 1;
     if (i < nx && j < ny && k < npz)
     { // Only consider the upper half in z-direction
-
         int nfx = (nx % 2 == 0) ? nx / 2 : nx / 2 + 1;
         int nfy = (ny % 2 == 0) ? ny / 2 : ny / 2 + 1;
         int nfz = (nz % 2 == 0) ? nz / 2 : nz / 2 + 1;
@@ -36,23 +35,26 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
             return;
         int h0 = static_cast<int>(mw / bin_size);
         int h1 = h0 + 1;
-        cuFloatComplex v0;
+        float v0;
         if (h0 < num_bins)
         {
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            v0 = d_array[idx];
+            auto grid_idx = cuCrealf(d_array[idx]);
+            v0 = grid_idx * fact;
+
             if (k != 0 && k != npz - 1)
             {
-                auto v1 = d_array[idbx];
-                v0 = cuCaddf(v0, v1);
-                v0 = cuCmulf(v0, make_cuFloatComplex(0.5f, 0.0f));
+                auto grid_idbx = cuCrealf(d_array[idbx]);
+                auto v1 = grid_idbx * fact;
+
+                v0 = 0.5f * (v0 + v1);
             }
-            atomicAdd(&d_histogram[h0], cuCrealf(v0));
+            atomicAdd(&d_histogram[h0], v0);
             atomicAdd(&d_nhist[h0], 1.0f);
             if (h0 != 0)
             {
-                atomicAdd(&d_histogram[h1], cuCrealf(v0));
+                atomicAdd(&d_histogram[h1], v0);
                 atomicAdd(&d_nhist[h1], 1.0f);
             }
         }
@@ -165,6 +167,15 @@ __global__ void gridSumKernel(cuFloatComplex *d_grid, size_t size, float *gridsu
     if (idx == 0)
     {
         gridsum[0] = d_grid[0].x;
+    }
+}
+__global__ void gridAddKernel(cuFloatComplex *grid_i, cuFloatComplex *grid_o, size_t size)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < (int)size)
+    {
+        grid_o[idx].x += grid_i[idx].x;
+        grid_o[idx].y += grid_i[idx].y;
     }
 }
 

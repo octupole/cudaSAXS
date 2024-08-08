@@ -44,10 +44,19 @@ public:
         npz = _npx;
     }
     void runPKernel(int, float, std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
-    void scaledCell();
     double getCudaTime() { return cudaTime / cudaCalls; }
-
+    void scaledCell();
+    void zeroIq();
+    void getHistogram(std::vector<std::vector<float>> &);
     std::vector<std::vector<float>> getSaxs();
+    void createMemory();
+    void resetHistogramParameters(std::vector<std::vector<float>> &);
+    void writeBanner();
+    void setcufftPlan(int nnx, int nny, int nnz)
+    {
+        cufftPlan3d(&cufftPlan, nnx, nny, nnz, CUFFT_R2C);
+    }
+    cufftHandle &getPlan() { return cufftPlan; }
 
     ~saxsKernel();
 
@@ -64,12 +73,16 @@ private:
     int num_bins;
     double cudaTime{0};
     double cudaCalls{0};
+    static int frame_count;
+    cufftHandle cufftPlan;
+
     thrust::device_vector<float> d_moduleX;
     thrust::device_vector<float> d_moduleY;
     thrust::device_vector<float> d_moduleZ;
     thrust::device_vector<float> d_grid;
     thrust::device_vector<float> d_gridSup;
     thrust::device_vector<cuFloatComplex> d_gridSupAcc;
+    thrust::device_vector<cuFloatComplex> d_Iq;
     thrust::device_vector<cuFloatComplex> d_gridSupC;
     thrust::device_vector<float> d_histogram;
     thrust::device_vector<float> d_nhist;
@@ -77,10 +90,6 @@ private:
     thrust::host_vector<float> h_moduleX;
     thrust::host_vector<float> h_moduleY;
     thrust::host_vector<float> h_moduleZ;
-    thrust::host_vector<float> h_grid;
-    thrust::host_vector<float> h_gridSup;
-    thrust::host_vector<cuFloatComplex> h_gridSupC;
-    thrust::host_vector<cuFloatComplex> h_gridSupAcc;
     thrust::host_vector<float> h_histogram;
     thrust::host_vector<float> h_nhist;
 
@@ -88,20 +97,18 @@ private:
     float *d_gridSup_ptr{nullptr};
     cuFloatComplex *d_gridSupC_ptr{nullptr};
     cuFloatComplex *d_gridSupAcc_ptr{nullptr};
+    cuFloatComplex *d_Iq_ptr{nullptr};
     // Do bspmod
     float *d_moduleX_ptr{nullptr};
     float *d_moduleY_ptr{nullptr};
     float *d_moduleZ_ptr{nullptr};
     float *d_histogram_ptr{nullptr};
     float *d_nhist_ptr{nullptr};
-    void writeBanner();
     std::function<int(int, float)> borderBins = [](int nx, float shell) -> int
     {
         return static_cast<int>(shell * nx / 2);
     };
 
-    void createMemory();
-    void resetHistogramParameters(std::vector<std::vector<float>> &);
     std::vector<long long> generateMultiples(long long limit);
     long long findClosestProduct(int n, float sigma);
 };

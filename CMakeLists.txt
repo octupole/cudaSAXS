@@ -24,12 +24,7 @@ include(CheckCXXSymbolExists)
 # Include directories for CUDA
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories("${PROJECT_SOURCE_DIR}/include")
-include_directories("${PROJECT_SOURCE_DIR}/System")
-include_directories("${PROJECT_SOURCE_DIR}/Saxs")
-include_directories("${PROJECT_SOURCE_DIR}/Utilities")
 include_directories("${PROJECT_SOURCE_DIR}/Exec")
-include_directories("${PROJECT_SOURCE_DIR}/fmt/include")
-include_directories("${PROJECT_SOURCE_DIR}/cudaKernels")
 # Include directories for Python3 and Pybind11
 include_directories(${Python3_INCLUDE_DIRS})
 include_directories(${pybind11_INCLUDE_DIRS})
@@ -48,7 +43,6 @@ add_subdirectory(Utilities)
 add_subdirectory(System)
 add_subdirectory(Saxs)
 add_subdirectory(Exec)
-add_subdirectory(cudaKernels)
 
 # Specify the target executable
 add_executable(cudaSAXS cudaSAXS.cu )
@@ -59,7 +53,7 @@ target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT
 set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries
-target_link_libraries(cudaSAXS cudaKernels exec saxs system utils ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
+target_link_libraries(cudaSAXS exec saxs system utils ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages

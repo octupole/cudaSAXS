@@ -13,9 +13,6 @@
 #include <algorithm>
 #include <numeric>
 #include <chrono>
-#include "Options.h"
-#include "saxsKernel.h"
-#include "Cell.h"
 
 #pragma once
 namespace py = pybind11;

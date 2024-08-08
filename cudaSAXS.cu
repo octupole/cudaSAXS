@@ -4,6 +4,7 @@
 #include <cstdlib> // for std::getenv
 #include <CLI/CLI.hpp>
 #include "Options.h"
+#include "Ftypedefs.h"
 
 /**
  * @brief Main entry point of the cudaSAXS application.

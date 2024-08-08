@@ -1,6 +1,5 @@
 #ifndef SAXSDEVICEKERNEL_H
 #define SAXSDEVICEKERNEL_H
-#include "Splines.h"
 #include "Options.h"
 #include <vector>
 #include <cufft.h>
@@ -17,7 +16,7 @@
 #include <fmt/core.h>
 
 __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *nhist, float *oc, int nx, int ny, int nz,
-                                    float bin_size, float Qcut, int num_bins);
+                                    float bin_size, float Qcut, int num_bins, float fact);
 
 __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
                               int numParticles, int nnx, int nny, int nnz);
@@ -32,4 +31,6 @@ __global__ void zeroDensityKernel(float *d_grid, size_t size);
 __global__ void zeroDensityKernel(cuFloatComplex *d_grid, size_t size);
 __global__ void gridSumKernel(cuFloatComplex *, size_t size, float *);
 __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int dy, int dz, float *Dens, int *count);
+__global__ void gridAddKernel(cuFloatComplex *grid_i, cuFloatComplex *grid_o, size_t size);
+
 #endif

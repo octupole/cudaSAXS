@@ -2,6 +2,9 @@
 #include <fstream>
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include "Options.h"
+#include "saxsKernel.h"
+#include "Cell.h"
 
 /// Creates a vector of integers with a specified start, end, and step.
 ///
@@ -79,6 +82,15 @@ void RunSaxs::Run(int beg, int end, int dt)
     saxsKernel myKernel(Options::nx, Options::ny, Options::nz, Options::order);
     myKernel.setnpx(8);
     myKernel.scaledCell();
+    analyzer.attr("read_frame")(0);
+    auto box_dimensions = analyzer.attr("get_box")().cast<std::vector<std::vector<float>>>();
+    Cell::calculateMatrices(box_dimensions);
+    auto oc = Cell::getOC();
+    myKernel.resetHistogramParameters(oc);
+    myKernel.createMemory();
+    myKernel.writeBanner();
+    myKernel.setcufftPlan(Options::nnx, Options::nny, Options::nnz);
+
     for (auto frame : args)
     {
 
@@ -102,6 +114,8 @@ void RunSaxs::Run(int beg, int end, int dt)
             std::cerr << "Python error: " << e.what() << std::endl;
         }
     }
+
+    myKernel.getHistogram(oc);
     auto myhisto = myKernel.getSaxs();
     std::ofstream myfile;
     myfile.open("saxs.dat");
