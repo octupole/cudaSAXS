@@ -69,6 +69,15 @@ int main(int argc, char *argv[])
     // Add optional cutoff on reciprocal space
     app.add_option("-q,--qcut ", Options::Qcut, "Cutoff on reciprocal space");
 
+    // Add optional cutoff on reciprocal space
+    app.add_option("--water", Options::Wmodel, "Model to use for the weighting function");
+
+    // Add optional cutoff on reciprocal space
+    app.add_option("--na ", Options::Sodium, "Sodium atoms");
+
+    // Add optional cutoff on reciprocal space
+    app.add_option("--cl ", Options::Chlorine, "Chlorine atoms");
+
     // Add help option
     app.set_help_flag("-h,--help", "Print usage");
 
@@ -117,6 +126,10 @@ int main(int argc, char *argv[])
     Options::nnx = nnx;
     Options::nny = nny;
     Options::nnz = nnz;
+    if (Options::Wmodel.size())
+    {
+        Options::myPadding = padding::given;
+    }
     // Get the input string from the command-line arguments
     RunSaxs saxs(tpr_file, xtc_file);
     saxs.Run(start, end, dt);

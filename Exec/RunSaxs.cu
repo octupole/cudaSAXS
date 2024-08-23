@@ -77,7 +77,6 @@ void RunSaxs::Run(int beg, int end, int dt)
         std::vector<int> value = item.second.cast<std::vector<int>>();
         index_map[key] = value;
     }
-
     auto start = std::chrono::high_resolution_clock::now();
     saxsKernel myKernel(Options::nx, Options::ny, Options::nz, Options::order);
     myKernel.setnpx(8);
@@ -86,6 +85,25 @@ void RunSaxs::Run(int beg, int end, int dt)
     auto box_dimensions = analyzer.attr("get_box")().cast<std::vector<std::vector<float>>>();
     Cell::calculateMatrices(box_dimensions);
     auto oc = Cell::getOC();
+    if (Options::myPadding == padding::given)
+    {
+        if (index_map.find("Na") != index_map.end() && Options::Sodium == 0)
+            Options::Sodium = index_map["Na"].size();
+        if (index_map.find("Cl") != index_map.end() && Options::Chlorine == 0)
+            Options::Chlorine = index_map["Cl"].size();
+
+        AtomCounter Density(box_dimensions[XX][XX], box_dimensions[YY][YY],
+                            box_dimensions[ZZ][ZZ], Options::Sodium, Options::Chlorine,
+                            Options::Wmodel, Options::nx, Options::ny, Options::nz);
+        Options::myWmodel = Density.calculateAtomCounts();
+        for (auto &pair : Options::myWmodel)
+        {
+            auto type = pair.first;
+            if (index_map.find(type) == index_map.end())
+                pair.second = 0.0f;
+        }
+    }
+
     myKernel.resetHistogramParameters(oc);
     myKernel.createMemory();
     myKernel.writeBanner();

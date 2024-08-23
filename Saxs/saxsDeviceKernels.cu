@@ -1,6 +1,7 @@
 #include <cufft.h>
 #include <cuComplex.h>
 #include <cuda_runtime.h>
+#include <cublas_v2.h>
 #include "Splines.h"
 #include "Ftypedefs.h"
 #include "opsfact.h"
@@ -317,4 +318,63 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
             atomicAdd(&Dens[0], grid[idx]);
         }
     }
+}
+// Custom kernel to complete the calculation
+__global__ void completeScatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq,
+                                      float *mw_values, float *Scatter,
+                                      int nnx, int nny, int nnz, float qcut)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    int total = nnx * nny * (nnz / 2 + 1);
+    if (idx < total)
+    {
+        float mw1 = mw_values[idx];
+        float mw2 = mw_values[idx + total];
+        float mw3 = mw_values[idx + 2 * total];
+        float mw = sqrt(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
+
+        if (mw <= qcut)
+        {
+            opsfact ff;
+            ff.allocate_device(Scatter);
+            cuFloatComplex fq = make_cuComplex(ff(mw), 0.0f);
+            cuFloatComplex mult = cuCmulf(fq, grid_q[idx]);
+            grid_oq[idx] = cuCaddf(grid_oq[idx], mult);
+        }
+    }
+}
+// Host function
+void scatterCalculation(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
+                        float *Scatter, int nnx, int nny, int nnz, float qcut)
+{
+    cublasHandle_t handle;
+    cublasCreate(&handle);
+
+    // Set up matrices for cublasSgemm
+    int m = 3;               // Number of rows in oc
+    int n = nnx * nny * nnz; // Total number of grid points
+    int k = 3;               // Number of columns in oc
+
+    float *d_indices; // Device array to store [ia, ja, ka] for all points
+    cudaMalloc(&d_indices, 3 * n * sizeof(float));
+    // Fill d_indices with appropriate values (you'll need a custom kernel for this)
+
+    float *d_result;
+    cudaMalloc(&d_result, m * n * sizeof(float));
+
+    float alpha = 2.0f * M_PI;
+    float beta = 0.0f;
+
+    // Perform matrix multiplication: d_result = alpha * oc * d_indices + beta * d_result
+    cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, oc, m, d_indices, k, &beta, d_result, m);
+
+    // Custom kernel to complete the calculation
+    dim3 block(256);
+    dim3 grid((n + block.x - 1) / block.x);
+    completeScatterKernel<<<grid, block>>>(grid_q, grid_oq, d_result, Scatter, nnx, nny, nnz, qcut);
+
+    // Clean up
+    cudaFree(d_indices);
+    cudaFree(d_result);
+    cublasDestroy(handle);
 }

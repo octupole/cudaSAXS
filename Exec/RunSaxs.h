@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <numeric>
 #include <chrono>
+#include "AtomCounter.h"
 
 #pragma once
 namespace py = pybind11;

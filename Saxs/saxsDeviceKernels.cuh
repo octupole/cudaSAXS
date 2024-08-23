@@ -14,7 +14,8 @@
 #include <map>
 #include "Ftypedefs.h"
 #include <fmt/core.h>
-
+void scatterCalculation(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
+                        float *Scatter, int nnx, int nny, int nnz, float qcut);
 __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float Qcut, int num_bins, float fact);
 
@@ -32,5 +33,7 @@ __global__ void zeroDensityKernel(cuFloatComplex *d_grid, size_t size);
 __global__ void gridSumKernel(cuFloatComplex *, size_t size, float *);
 __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int dy, int dz, float *Dens, int *count);
 __global__ void gridAddKernel(cuFloatComplex *grid_i, cuFloatComplex *grid_o, size_t size);
-
+__global__ void completeScatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq,
+                                      float *mw_values, float *Scatter,
+                                      int nnx, int nny, int nnz, float qcut);
 #endif

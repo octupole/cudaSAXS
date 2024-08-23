@@ -146,15 +146,26 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
 
         // Synchronize the device
         cudaDeviceSynchronize();
-        paddingKernel<<<gridDim0, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
-                                              thrust::raw_pointer_cast(d_Dens.data()),
-                                              thrust::raw_pointer_cast(d_count.data()));
-        // Synchronize the device
-        cudaDeviceSynchronize();
+        float myDens = 0.0f;
+        if (Options::myPadding == padding::avg)
+        {
+            paddingKernel<<<gridDim0, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
+                                                  thrust::raw_pointer_cast(d_Dens.data()),
+                                                  thrust::raw_pointer_cast(d_count.data()));
+            // Synchronize the device
+            cudaDeviceSynchronize();
+            h_Dens = d_Dens;
+            h_count = d_count;
+            myDens = h_Dens[0] / (float)h_count[0];
+        }
+        else
+        {
+            if (Options::myWmodel.find(type) != Options::myWmodel.end())
+            {
+                myDens = Options::myWmodel[type];
+            }
+        }
 
-        h_Dens = d_Dens;
-        h_count = d_count;
-        float myDens = h_Dens[0] / (float)h_count[0];
         // zeroes the Sup density grid
         zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
         cudaDeviceSynchronize();
@@ -164,9 +175,8 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         cudaDeviceSynchronize();
 
         cufftExecR2C(plan, d_gridSup_ptr, d_gridSupC_ptr);
-        cudaDeviceSynchronize();
-
         // Synchronize the device
+        cudaDeviceSynchronize();
         scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz, kcut);
         cudaDeviceSynchronize();
         totParticles += numParticles;

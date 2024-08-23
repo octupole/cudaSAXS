@@ -2,7 +2,13 @@
 #define OPTIONS_H
 #include <string>
 #include <vector>
+#include <map>
 #pragma once
+enum class padding
+{
+    avg,
+    given
+};
 
 class Options
 {
@@ -12,6 +18,10 @@ public:
     static int nnx, nny, nnz;
     static float sigma, Dq, Qcut;
     static int order;
+    static std::string Wmodel;
+    static int Sodium, Chlorine;
+    static padding myPadding;
+    static std::map<std::string, float> myWmodel;
 
 private:
     Options() {};

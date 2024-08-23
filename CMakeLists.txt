@@ -14,6 +14,9 @@ find_package(pybind11 REQUIRED)
 
 # Find CUDA toolkit
 find_package(CUDAToolkit REQUIRED)
+# Add cuBLAS library
+find_library(CUBLAS_LIBRARIES cublas HINTS ${CUDA_TOOLKIT_ROOT_DIR}/lib64 ${CUDA_TOOLKIT_ROOT_DIR}/lib)
+
 # Find OpenMP
 find_package(OpenMP REQUIRED)
 
@@ -53,7 +56,7 @@ target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT
 set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Link libraries
-target_link_libraries(cudaSAXS exec saxs system utils ${CUDA_LIBRARIES} cufft fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
+target_link_libraries(cudaSAXS exec saxs system utils ${CUDA_LIBRARIES} cufft cublas fmt::fmt Python3::Python pybind11::module OpenMP::OpenMP_CXX)
 add_compile_definitions(PY_SOURCE_DIR="${CMAKE_SOURCE_DIR}/pysrc")
 
 # Debugging messages
