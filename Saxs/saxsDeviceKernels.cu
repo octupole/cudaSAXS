@@ -253,6 +253,67 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
         }
     }
 }
+__global__ void rhoCartKernel(float *xa, float *oc, float *grid, int order, int numParticles, int nx, int ny, int nz)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < numParticles)
+    {
+        Splines bsplineX;
+        Splines bsplineY;
+        Splines bsplineZ;
+
+        int nx0 = static_cast<int>(nx);
+        int ny0 = static_cast<int>(ny);
+        int nz0 = static_cast<int>(nz);
+        float x0, y0, z0, x1, y1, z1, r1, s1, t1, gx, gy, gz;
+        int mx, my, mz;
+        x0 = xa[idx * DIM + XX];
+        y0 = xa[idx * DIM + YY];
+        z0 = xa[idx * DIM + ZZ];
+        x1 = oc[XX * DIM + XX] * x0 + oc[XX * DIM + YY] * y0 + oc[XX * DIM + ZZ] * z0;
+        y1 = oc[YY * DIM + XX] * x0 + oc[YY * DIM + YY] * y0 + oc[YY * DIM + ZZ] * z0;
+        z1 = oc[ZZ * DIM + XX] * x0 + oc[ZZ * DIM + YY] * y0 + oc[ZZ * DIM + ZZ] * z0;
+
+        r1 = static_cast<float>(nx0 * (x1 - rint(x1 - 0.5)));
+        s1 = static_cast<float>(ny0 * (y1 - rint(y1 - 0.5)));
+        t1 = static_cast<float>(nz0 * (z1 - rint(z1 - 0.5)));
+        mx = static_cast<int>(r1);
+        my = static_cast<int>(s1);
+        mz = static_cast<int>(t1);
+
+        gx = r1 - static_cast<float>(mx);
+        gy = s1 - static_cast<float>(my);
+        gz = t1 - static_cast<float>(mz);
+        spline splX = bsplineX(gx);
+        spline splY = bsplineX(gy);
+        spline splZ = bsplineX(gz);
+        int i0 = mx - order;
+        for (auto o = 0; o < order; o++)
+        {
+            int i = i0 + (nx0 - ((i0 >= 0) ? nx0 : -nx0)) / 2;
+
+            int j0 = my - order;
+            for (auto p = 0; p < order; p++)
+            {
+                int j = j0 + (ny0 - ((j0 >= 0) ? ny0 : -ny0)) / 2;
+
+                int k0 = mz - order;
+                for (auto q = 0; q < order; q++)
+                {
+                    int k = k0 + (nz0 - ((k0 >= 0) ? nz0 : -nz0)) / 2;
+                    float fact_o = splX.x[o];
+                    float fact_p = fact_o * splY.x[p];
+                    float fact_q = fact_p * splZ.x[q];
+                    int ig = k + j * nz0 + i * nz0 * ny0;
+                    atomicAdd(&grid[ig], fact_q);
+                    k0++;
+                }
+                j0++;
+            }
+            i0++;
+        }
+    }
+}
 /**
  * @brief Kernel function to initialize a 3D grid with a given density value.
  *

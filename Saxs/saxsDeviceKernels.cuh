@@ -26,6 +26,8 @@ __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, f
                               float *Scatter, int nnx, int nny, int nnz, float Qcut);
 __global__ void rhoKernel(float *xa, float *grid, int order,
                           int numParticles, int nx, int ny, int nz);
+__global__ void rhoCartKernel(float *xa, float *oc, float *grid, int order,
+                              int numParticles, int nx, int ny, int nz);
 __global__ void superDensityKernel(float *d_grid, float *d_gridSup, float myDens,
                                    int nx, int ny, int nz, int nnx, int nny, int nnz);
 __global__ void zeroDensityKernel(float *d_grid, size_t size);

@@ -69,13 +69,17 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     float mySigma = (float)Options::nx / (float)Options::nnx;
 
     thrust::host_vector<float> h_oc(DIM * DIM);
+    thrust::host_vector<float> h_oc_or(DIM * DIM);
     for (int i = 0; i < DIM; ++i)
         for (int j = 0; j < DIM; ++j)
         {
             h_oc[i * DIM + j] = mySigma * oc[i][j];
+            h_oc_or[i * DIM + j] = oc[i][j];
         }
     thrust::device_vector<float> d_oc = h_oc;
+    thrust::device_vector<float> d_oc_or = h_oc_or;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
+    float *d_oc_or_ptr = thrust::raw_pointer_cast(d_oc_or.data());
 
     dim3 blockDim(npx, npy, npz);
     dim3 gridDim((nnx + blockDim.x - 1) / blockDim.x,
@@ -105,29 +109,25 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     auto plan = this->getPlan();
     for (const auto &pair : index_map)
     {
-
         thrust::host_vector<float> h_Dens = {0.0f};
         thrust::host_vector<int> h_count = {0};
         thrust::device_vector<float> d_Dens = h_Dens;
         thrust::device_vector<int> d_count = h_count;
+
         std::string type = pair.first;
         std::vector<int> value = pair.second;
-        std::vector<std::vector<float>> Particles;
+        // Create a host vector to hold the particles
+        thrust::host_vector<float> h_particles;
+        h_particles.reserve(value.size() * 3);
+        // Fill the host vector with the particles according to the indices
+        std::for_each(value.begin(), value.end(), [&h_particles, &coords](int i)
+                      { h_particles.insert(h_particles.end(), coords[i].begin(), coords[i].end()); });
+        // define the number of particles
+        this->numParticles = value.size();
 
-        std::transform(value.begin(), value.end(), std::back_inserter(Particles), [&coords](int i)
-                       { return coords[i]; });
-
-        this->numParticles = Particles.size();
         // Allocate and copy particles to the device
-        thrust::host_vector<float> h_particles(numParticles * 3);
-        for (int i = 0; i < numParticles; ++i)
-        {
-            h_particles[i * 3] = oc[XX][XX] * Particles[i][XX] + oc[XX][YY] * Particles[i][YY] + oc[XX][ZZ] * Particles[i][ZZ];
-            h_particles[i * 3 + 1] = oc[YY][XX] * Particles[i][XX] + oc[YY][YY] * Particles[i][YY] + oc[YY][ZZ] * Particles[i][ZZ];
-            h_particles[i * 3 + 2] = oc[ZZ][XX] * Particles[i][XX] + oc[ZZ][YY] * Particles[i][YY] + oc[ZZ][ZZ] * Particles[i][ZZ];
-        }
-
         thrust::device_vector<float> d_particles = h_particles;
+        // Copy the host vector to the device
         thrust::host_vector<float> h_scatter = Scattering::getScattering(type);
         thrust::device_vector<float> d_scatter = h_scatter;
 
@@ -137,15 +137,15 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         int numBlocks = (numParticles + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
         //    Kernels launch for the rhoKernel
-
         zeroDensityKernel<<<numBlocksGrid, THREADS_PER_BLOCK>>>(d_grid_ptr, d_grid.size());
         cudaDeviceSynchronize();
         // Check for errors
-        rhoKernel<<<numBlocks, THREADS_PER_BLOCK>>>(d_particles_ptr, d_grid_ptr, order,
-                                                    numParticles, nx, ny, nz);
+        rhoCartKernel<<<numBlocks, THREADS_PER_BLOCK>>>(d_particles_ptr, d_oc_or_ptr, d_grid_ptr, order,
+                                                        numParticles, nx, ny, nz);
 
         // Synchronize the device
         cudaDeviceSynchronize();
+        // picking the padding
         float myDens = 0.0f;
         if (Options::myPadding == padding::avg)
         {
