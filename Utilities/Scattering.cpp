@@ -5,6 +5,7 @@
  * The map keys are element symbols, and the values are vectors of
  * scattering factor coefficients for that element.
  */
+
 std::map<std::string, std::vector<std::vector<float>>> Scattering::it1992 = {
     {"Du", {{1.0, 0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0}, {0.0}}},
     {"H", {{0.493002, 0.322912, 0.140191, 0.040810}, {10.5109, 26.1257, 3.14236, 57.7997}, {0.003038}}},

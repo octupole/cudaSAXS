@@ -8,6 +8,9 @@
 #include "BSpmod.h"
 namespace BSpline
 {
+	/// Declares static member variables for the BSpmod class, including the dimensions of the spline
+	/// coefficients (nx, ny, nz) and the total number of dimensions (ndim). Also declares the spline
+	/// order (order) and some mathematical constants (twopi, tiny).
 	size_t BSpmod::nx = 0;
 	size_t BSpmod::ny = 0;
 	size_t BSpmod::nz = 0;
@@ -16,6 +19,9 @@ namespace BSpline
 
 	const float twopi = M_PI * 2.0;
 	const float tiny = 1.0e-7;
+	/// Computes the inverse of the values in the x, y, and z components of the BSp struct.
+	/// This is used to invert the results of the DFTmod function, which computes the modulus
+	/// of the Discrete Fourier Transform of the input vector.
 	void BSpmod::Inverse()
 	{
 		for (auto &v : BSp.x)
@@ -31,6 +37,11 @@ namespace BSpline
 			v = 1.0 / v;
 		}
 	}
+	/// Loads the moduli values for the x, y, and z components of the BSp struct.
+	/// This function computes the modulus of the Discrete Fourier Transform of the
+	/// input vector A0, which contains the spline coefficients. The Gamma function
+	/// is then applied to the moduli values, and the inverse of the moduli values
+	/// is computed and stored in the BSp struct.
 	void BSpmod::load_moduli()
 	{
 		BSpline tmp;
@@ -48,6 +59,14 @@ namespace BSpline
 		Gamma(BSp.z);
 		Inverse();
 	}
+	/// Computes the modulus of the Discrete Fourier Transform (DFT) of the input vector A.
+	/// The modulus is computed by taking the square root of the sum of the squares of the
+	/// real and imaginary parts of the DFT. The resulting modulus values are stored in
+	/// the output vector bsp.
+	///
+	/// @param A The input vector for which the DFT modulus is to be computed.
+	/// @param Ndim The size of the input vector A.
+	/// @return The vector of DFT modulus values.
 	vector<float> BSpmod::DFTmod(const vector<float> &A, size_t Ndim)
 	{
 		vector<float> bsp(Ndim, 0.0);
@@ -67,6 +86,13 @@ namespace BSpline
 		return bsp;
 	}
 
+	/// Applies the Gamma function to the moduli values in the input vector bsp.
+	/// The Gamma function is computed as a sum of terms involving the ratio of the
+	/// input value to the sum or difference of the input value and multiples of pi.
+	/// The resulting Gamma-transformed moduli values are stored back in the input
+	/// vector bsp.
+	///
+	/// @param bsp The vector of moduli values to which the Gamma function is applied.
 	void BSpmod::Gamma(vector<float> &bsp)
 	{
 

@@ -1,3 +1,11 @@
+#[[
+ * @file CMakeLists.txt
+ * @brief Defines the build configuration for the System library.
+ *
+ * This CMakeLists.txt file sets the minimum required CMake version, configures the
+ * build type, specifies the source files to be compiled into the System library,
+ * and defines a compile definition for the Python source directory.
+]]
 # Policy
 cmake_minimum_required( VERSION 3.0) 
 

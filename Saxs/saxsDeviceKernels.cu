@@ -253,6 +253,20 @@ __global__ void rhoKernel(float *xa, float *grid, int order, int numParticles, i
         }
     }
 }
+/**
+ * @brief CUDA kernel function to compute the density of particles on a 3D grid using B-spline interpolation.
+ *
+ * This kernel function takes the particle positions and orientations, and computes the density of the particles on a 3D grid using B-spline interpolation. The grid is represented as a 1D array, and the kernel function calculates the 1D index from the 3D coordinates of each grid point.
+ *
+ * @param xa Array of particle positions.
+ * @param oc Array of particle orientations.
+ * @param grid Pointer to the 1D array representing the 3D grid of floating-point values.
+ * @param order The order of the B-spline interpolation.
+ * @param numParticles The number of particles.
+ * @param nx The size of the grid in the x-dimension.
+ * @param ny The size of the grid in the y-dimension.
+ * @param nz The size of the grid in the z-dimension.
+ */
 __global__ void rhoCartKernel(float *xa, float *oc, float *grid, int order, int numParticles, int nx, int ny, int nz)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;

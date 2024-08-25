@@ -1,3 +1,41 @@
+"""
+Initializes the Topology class with the given TPR and XTC files, and provides methods to build a graph representation of the molecular topology, classify the molecules into different types, and read and extract information from the XTC trajectory file.
+
+The Topology class has the following methods:
+
+__init__(tpr_file, xtc_file):
+    Initializes the Topology object with the given TPR and XTC files, builds the molecular graph, and classifies the molecules.
+
+__build_graph():
+    Builds a graph representation of the molecular topology, where atoms are nodes and bonds are edges.
+
+__classify_molecules():
+    Classifies the molecules into proteins, waters, ions, and other types based on the residues present in each molecule.
+
+count_molecules():
+    Counts the total number of molecules and the number of molecules in each category (proteins, waters, ions, others).
+
+generate_molecule_dict():
+    Generates a dictionary with detailed information about each molecule, including the list of atom indices for each molecule.
+
+get_atom_index():
+    Returns a dictionary mapping atom types to lists of their corresponding atom indices.
+
+read_frame(frame_number):
+    Reads the specified frame from the XTC trajectory file.
+
+get_box():
+    Returns the box dimensions for the current frame.
+
+get_step():
+    Returns the step number for the current frame.
+
+get_time():
+    Returns the time for the current frame.
+
+get_coordinates():
+    Returns the coordinates for the atoms in the current frame.
+"""
 #!/usr/bin/env python
 import argparse
 import MDAnalysis as mda

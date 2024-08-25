@@ -1,3 +1,24 @@
+#[[
+ * @file CMakeLists.txt
+ * @brief CMake configuration file for the cudaSAXS project.
+ *
+ * This CMake file sets up the build environment for the cudaSAXS project, which
+ * includes the following:
+ *
+ * - Specifies the minimum required CMake version and the project name.
+ * - Configures the C++ and CUDA standards to be used.
+ * - Finds and includes the necessary dependencies, such as Python3, pybind11,
+ *   CUDA, cuBLAS, and OpenMP.
+ * - Includes the necessary directories for CUDA, Python3, and pybind11.
+ * - Sets the CUDA architectures to be supported.
+ * - Enables optimization flags for CUDA and C++ compilation.
+ * - Adds subdirectories for the project's components (fmt, Utilities, System,
+ *   Saxs, Exec).
+ * - Specifies the target executable (cudaSAXS) and links the necessary
+ *   libraries.
+ * - Adds a compile definition for the Python source directory.
+ * - Prints debugging messages for the include and library directories.
+]]
 cmake_minimum_required(VERSION 3.18)
 #list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
 project(cudaSAXS LANGUAGES CXX C CUDA)

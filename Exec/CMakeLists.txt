@@ -1,3 +1,21 @@
+#[[
+ * @file Exec/CMakeLists.txt
+ * @brief Defines the build configuration for the 'exec' library.
+ *
+ * This CMakeLists.txt file sets the minimum required CMake version, configures the build type, defines the source files for the 'exec' library, adds compile definitions, and includes necessary directories for the library.
+ *
+ * The 'exec' library is built as a static library and includes the following source files:
+ * - RunSaxs.cu
+ * - Options.cpp
+ *
+ * The library includes directories from the following project directories:
+ * - Saxs
+ * - System
+ * - pysrc
+ * - fmt/include
+ *
+ * The PY_SOURCE_DIR compile definition is also set to the pysrc directory within the project source directory.
+ ]]
 # Policy
 cmake_minimum_required( VERSION 3.0) 
 

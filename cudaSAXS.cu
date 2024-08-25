@@ -7,24 +7,17 @@
 #include "Ftypedefs.h"
 
 /**
- * @brief Main entry point of the cudaSAXS application.
+ * @brief Main entry point of the application.
  *
- * This function parses command-line arguments using the CLI11 library and sets up the necessary parameters for running the SAXS simulation. It then creates a `RunSaxs` object and calls its `Run()` method to execute the simulation.
+ * This function sets up and parses command-line arguments using the CLI11 library.
+ * It extracts various options and parameters from the command line, such as the topology file,
+ * trajectory file, grid size, start and end frames, and other optional parameters.
+ * It then creates a RunSaxs object and calls its Run() method to execute the SAXS calculation.
+ * Finally, it prints a completion message to the console.
  *
- * The command-line arguments include:
- * - `-s,--topology`: Required option for the topology file (.tpr)
- * - `-x,--trajectory`: Required option for the trajectory file (.xtc)
- * - `-g,--grid`: Required option for the grid length (can be a single value or a vector of 3 values)
- * - `-b,--begin`: Required option for the initial frame
- * - `-e,--end`: Required option for the last frame
- * - `--dt`: Optional option for the frame read interval
- * - `--order`: Optional option for the BSpline order
- * - `--gridS`: Optional option for the scaled grid length (can be a single value or a vector of 3 values)
- * - `--Scale`: Optional option for the multiplicative factor to obtain the largest scaled grid
- * - `--bin,--Dq`: Optional option for the bin size of the histogram
- * - `-h,--help`: Prints the usage information
- *
- * After parsing the command-line arguments, the function sets the appropriate values in the `Options` struct and then creates a `RunSaxs` object to run the SAXS simulation. Finally, it prints a message indicating that the program has completed.
+ * @param argc The number of command-line arguments.
+ * @param argv The array of command-line arguments.
+ * @return 0 on successful completion, 1 on error.
  */
 int main(int argc, char *argv[])
 {
@@ -36,6 +29,30 @@ int main(int argc, char *argv[])
     std::vector<int> myNS;
     int start, end, dt{1};
 
+    /**
+     * @brief Adds various command-line options to the CLI11 app object.
+     *
+     * This function adds the following options to the CLI11 app object:
+     * - Topology file (-s,--topology)
+     * - Trajectory file (-x,--trajectory)
+     * - Grid size (-g,--grid)
+     * - Initial frame (-b,--begin)
+     * - Last frame (-e,--end)
+     * - Output file (-o,--out)
+     * - Frame read interval (--dt)
+     * - BSpline order (--order)
+     * - Scaled grid size (--gridS)
+     * - Grid scale factor (--Scale)
+     * - Histogram bin size (--bin,--Dq)
+     * - Reciprocal space cutoff (-q,--qcut)
+     * - Water model (--water)
+     * - Sodium atom count (--na)
+     * - Chlorine atom count (--cl)
+     * - Help flag (-h,--help)
+     *
+     * These options are used to configure the SAXS calculation performed by the
+     * RunSaxs class.
+     */
     // Add required option for topology file
     app.add_option("-s,--topology", tpr_file, "Topology file (.tpr)")->required();
 

@@ -1,3 +1,9 @@
+/// <summary>
+/// Provides a set of options and configuration parameters for the application.
+/// </summary>
+/// <remarks>
+/// The `Options` class is a static class that holds various configuration parameters and options for the application. These include file paths, dimensions, constants, and other settings that are used throughout the codebase.
+/// </remarks>
 #ifndef OPTIONS_H
 #define OPTIONS_H
 #include <string>
