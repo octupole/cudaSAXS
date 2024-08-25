@@ -400,18 +400,41 @@ void saxsKernel::resetHistogramParameters(std::vector<std::vector<float>> &oc)
 }
 void saxsKernel::writeBanner()
 {
-    std::string banner = fmt::format(
-        "*************************************************\n"
-        "* {:^40}      *\n"
-        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
-        "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
-        "* {:<10} {:>4}      {:<10} {:>4}          *\n"
-        "* {:<10} {:>4.3f}     {:<10} {:>2.f}      *\n"
-        "*************************************************\n\n",
-        "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
-        "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
-        Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq, "Q Cutoff ", Options::Qcut);
-
+    std::string padding = Options::myPadding == padding::given ? Options::Wmodel : "avg Border";
+    std::string banner{""};
+    if (Options::myPadding == padding::avg)
+    {
+        banner = fmt::format(
+            "*************************************************\n"
+            "* {:^40}      *\n"
+            "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+            "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+            "* {:<10} {:>4}      {:<10} {:>4}          *\n"
+            "* {:<10} {:>4.3f}     {:<10} {:>2.f}      *\n"
+            "* {:<10}           {:<14}           *\n"
+            "*************************************************\n\n",
+            "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
+            "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
+            Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq, "Q Cutoff ", Options::Qcut, "Padding ", padding);
+    }
+    else
+    {
+        banner = fmt::format(
+            "*************************************************\n"
+            "* {:^40}      *\n"
+            "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+            "* {:<19} {:>4} * {:>4} * {:>4}        *\n"
+            "* {:<10} {:>4}      {:<10} {:>4}          *\n"
+            "* {:<10} {:>4.3f}     {:<10} {:>2.f}      *\n"
+            "* {:<10}           {:<14}           *\n"
+            "* {:<10} {:>4d}      {:<10} {:>4d}          *\n"
+            "*************************************************\n\n",
+            "Running cudaSAXS", "Cell Grid", Options::nx, Options::ny, Options::nz,
+            "Supercell Grid", Options::nnx, Options::nny, Options::nnz, "Order",
+            Options::order, "Sigma", Options::sigma, "Bin Size", Options::Dq, "Q Cutoff ",
+            Options::Qcut, "Padding ", padding,
+            "Na ions", Options::Sodium, "Cl Ions", Options::Chlorine);
+    }
     std::cout << banner;
 }
 

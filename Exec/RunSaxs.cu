@@ -136,7 +136,7 @@ void RunSaxs::Run(int beg, int end, int dt)
     myKernel.getHistogram(oc);
     auto myhisto = myKernel.getSaxs();
     std::ofstream myfile;
-    myfile.open("saxs.dat");
+    myfile.open(Options::outFile);
     for (auto data : myhisto)
     {
         myfile << data[0] << " " << data[1] << std::endl;

@@ -51,6 +51,9 @@ int main(int argc, char *argv[])
     // Add optional option grid size
     app.add_option("-e,--end ", end, "Last Frame")->required();
 
+    // Add optional cutoff on reciprocal space
+    app.add_option("-o,--out", Options::outFile, "Model to use for the weighting function");
+
     // Add optional option grid size
     app.add_option("--dt ", dt, "Read two frames every dt");
 

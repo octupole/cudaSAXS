@@ -22,6 +22,7 @@ public:
     static int Sodium, Chlorine;
     static padding myPadding;
     static std::map<std::string, float> myWmodel;
+    static std::string outFile;
 
 private:
     Options() {};
