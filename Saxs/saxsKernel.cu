@@ -98,7 +98,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // zeroes the Sup density grid
     zeroDensityKernel<<<numBlocksGridSuperAcc, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_gridSupAcc.size());
 
-    int totParticles = 0;
+    float totParticles{0};
     std::string formatted_string = fmt::format("--> Frame: {:<7}  Time Step: {:.2f} fs", frame, Time);
 
     // Print the formatted string
@@ -109,10 +109,12 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     auto plan = this->getPlan();
     for (const auto &pair : index_map)
     {
+        thrust::host_vector<float> h_nato = {0.0f};
         thrust::host_vector<float> h_Dens = {0.0f};
         thrust::host_vector<int> h_count = {0};
         thrust::device_vector<float> d_Dens = h_Dens;
         thrust::device_vector<int> d_count = h_count;
+        thrust::device_vector<float> d_nato = h_nato;
 
         std::string type = pair.first;
         std::vector<int> value = pair.second;
@@ -177,13 +179,13 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         cufftExecR2C(plan, d_gridSup_ptr, d_gridSupC_ptr);
         // Synchronize the device
         cudaDeviceSynchronize();
-        scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz, kcut);
+        scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz, kcut, thrust::raw_pointer_cast(d_nato.data()));
         cudaDeviceSynchronize();
-        totParticles += numParticles;
+        h_nato = d_nato;
+        totParticles += h_nato[0];
     }
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
     // // Synchronize the device
-
     cudaDeviceSynchronize();
 
     gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());

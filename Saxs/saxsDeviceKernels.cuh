@@ -20,10 +20,10 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
                                     float bin_size, float Qcut, int num_bins, float fact);
 
 __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
-                              int numParticles, int nnx, int nny, int nnz);
+                              float numParticles, int nnx, int nny, int nnz);
 
 __global__ void scatterKernel(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
-                              float *Scatter, int nnx, int nny, int nnz, float Qcut);
+                              float *Scatter, int nnx, int nny, int nnz, float Qcut, float *numParticles);
 __global__ void rhoKernel(float *xa, float *grid, int order,
                           int numParticles, int nx, int ny, int nz);
 __global__ void rhoCartKernel(float *xa, float *oc, float *grid, int order,
