@@ -184,7 +184,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         h_nato = d_nato;
         totParticles += h_nato[0];
     }
-    modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, totParticles, nnx, nny, nnz);
+    modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, nnx, nny, nnz);
     // // Synchronize the device
     cudaDeviceSynchronize();
 

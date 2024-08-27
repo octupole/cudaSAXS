@@ -78,7 +78,7 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
  * @param nnz The number of grid points in the z-dimension.
  */
 __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, float *modZ,
-                              float numParticles, int nnx, int nny, int nnz)
+                              int nnx, int nny, int nnz)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -90,7 +90,7 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
         float bsp_i = modX[i];
         float bsp_j = modX[j];
         float bsp_k = modX[k];
-        float bsp_ijk = bsp_i * bsp_j * bsp_k / numParticles;
+        float bsp_ijk = bsp_i * bsp_j * bsp_k;
         cuFloatComplex bsp = make_cuComplex(bsp_ijk, 0.0f);
         grid_q[idx] = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
         grid_q[idx] = cuCmulf(grid_q[idx], bsp);
