@@ -198,7 +198,6 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                    bin_size, kcut, num_bins);
         cudaDeviceSynchronize();
-        std::cout << h_oc[0] << std::endl;
     }
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);

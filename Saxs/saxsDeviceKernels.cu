@@ -35,29 +35,20 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         if (mw > qcut)
             return;
         int h0 = static_cast<int>(mw / bin_size);
-        int h1 = h0 + 1;
-        float v0;
         if (h0 < num_bins)
         {
+            float v0;
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            auto grid_idx = d_array[idx].x;
-            v0 = grid_idx * fact;
-
-            if (k != 0 && k != npz - 1)
+            float nv0{2.0f};
+            v0 = (d_array[idx].x + d_array[idbx].x) * fact;
+            if (i == 0 && j == 0 && k == 0)
             {
-                auto grid_idbx = d_array[idbx].x;
-                auto v1 = grid_idbx * fact;
-
-                v0 = 0.5f * (v0 + v1);
+                v0 = d_array[idx].x * fact;
+                nv0 = 1.0f;
             }
             atomicAdd(&d_histogram[h0], v0);
-            atomicAdd(&d_nhist[h0], 1.0f);
-            if (h0 != 0)
-            {
-                atomicAdd(&d_histogram[h1], v0);
-                atomicAdd(&d_nhist[h1], 1.0f);
-            }
+            atomicAdd(&d_nhist[h0], nv0);
         }
     }
 }
@@ -135,8 +126,8 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
     {
         int idx = k + j * nnpz + i * nnpz * nny;
         float bsp_i = modX[i];
-        float bsp_j = modX[j];
-        float bsp_k = modX[k];
+        float bsp_j = modY[j];
+        float bsp_k = modZ[k];
         float bsp_ijk = bsp_i * bsp_j * bsp_k;
         cuFloatComplex bsp = make_cuComplex(bsp_ijk, 0.0f);
         grid_q[idx] = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
