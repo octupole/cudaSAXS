@@ -98,6 +98,9 @@ int main(int argc, char *argv[])
     // Add optional cutoff on reciprocal space
     app.add_option("--cl ", Options::Chlorine, "Chlorine atoms");
 
+    // Add optional for constant pressure simulation
+    app.add_option("--simulation, --simu", Options::Simulation, "Valid values are npt and nvt");
+
     // Add help option
     app.set_help_flag("-h,--help", "Print usage");
 

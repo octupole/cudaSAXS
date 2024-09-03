@@ -29,6 +29,7 @@ public:
     static padding myPadding;
     static std::map<std::string, float> myWmodel;
     static std::string outFile;
+    static std::string Simulation;
 
 private:
     Options() {};

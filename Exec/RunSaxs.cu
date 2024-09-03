@@ -132,9 +132,12 @@ void RunSaxs::Run(int beg, int end, int dt)
             std::cerr << "Python error: " << e.what() << std::endl;
         }
     }
-
-    myKernel.getHistogram(oc);
-    auto myhisto = myKernel.getSaxs();
+    std::vector<std::vector<float>> myhisto;
+    if (Options::Simulation == "nvt")
+    {
+        myKernel.getHistogram(oc);
+    }
+    myhisto = myKernel.getSaxs();
     std::ofstream myfile;
     myfile.open(Options::outFile);
     for (auto data : myhisto)

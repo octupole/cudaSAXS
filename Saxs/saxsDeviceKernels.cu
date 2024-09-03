@@ -41,12 +41,12 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         {
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            auto grid_idx = cuCrealf(d_array[idx]);
+            auto grid_idx = d_array[idx].x;
             v0 = grid_idx * fact;
 
             if (k != 0 && k != npz - 1)
             {
-                auto grid_idbx = cuCrealf(d_array[idbx]);
+                auto grid_idbx = d_array[idbx].x;
                 auto v1 = grid_idbx * fact;
 
                 v0 = 0.5f * (v0 + v1);
@@ -58,6 +58,53 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
                 atomicAdd(&d_histogram[h1], v0);
                 atomicAdd(&d_nhist[h1], 1.0f);
             }
+        }
+    }
+}
+__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
+                                    float bin_size, float qcut, int num_bins)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int npz = nz / 2 + 1;
+    if (i < nx && j < ny && k < npz)
+    { // Only consider the upper half in z-direction
+        int nfx = (nx % 2 == 0) ? nx / 2 : nx / 2 + 1;
+        int nfy = (ny % 2 == 0) ? ny / 2 : ny / 2 + 1;
+        int nfz = (nz % 2 == 0) ? nz / 2 : nz / 2 + 1;
+
+        int ia = (i < nfx) ? i : i - nx;
+        int ja = (j < nfy) ? j : j - ny;
+        int ka = (k < nfz) ? k : k - nz;
+        int ib = i == 0 ? 0 : nx - i;
+        int jb = j == 0 ? 0 : ny - j;
+        float mw1, mw2, mw3, mw;
+        mw1 = oc[XX * DIM + XX] * ia + oc[XX * DIM + YY] * ja + oc[XX * DIM + ZZ] * ka;
+        mw1 = 2.0 * M_PI * mw1;
+        mw2 = oc[YY * DIM + XX] * ia + oc[YY * DIM + YY] * ja + oc[YY * DIM + ZZ] * ka;
+        mw2 = 2.0 * M_PI * mw2;
+        mw3 = oc[ZZ * DIM + XX] * ia + oc[ZZ * DIM + YY] * ja + oc[ZZ * DIM + ZZ] * ka;
+        mw3 = 2.0 * M_PI * mw3;
+        mw = sqrtf(mw1 * mw1 + mw2 * mw2 + mw3 * mw3);
+
+        if (mw > qcut)
+            return;
+        int h0 = static_cast<int>(mw / bin_size);
+        if (h0 < num_bins)
+        {
+            float v0;
+            int idx = k + j * npz + i * npz * ny;
+            int idbx = k + jb * npz + ib * npz * ny;
+            float nv0{2.0f};
+            v0 = d_array[idx].x + d_array[idbx].x;
+            if (i == 0 && j == 0 && k == 0)
+            {
+                v0 = d_array[idx].x;
+                nv0 = 1.0f;
+            }
+            atomicAdd(&d_histogram[h0], v0);
+            atomicAdd(&d_nhist[h0], nv0);
         }
     }
 }

@@ -32,6 +32,7 @@ void saxsKernel::getHistogram(std::vector<std::vector<float>> &oc)
     thrust::device_vector<float> d_oc = h_oc;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
     float frames_fact = 1.0 / (float)frame_count;
+    std::cout << "frames_fact: " << bin_size << " " << kcut << " " << num_bins << std::endl;
     calculate_histogram<<<gridDim, blockDim>>>(d_Iq_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                bin_size, kcut, num_bins, frames_fact);
 }
@@ -187,10 +188,18 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, nnx, nny, nnz);
     // // Synchronize the device
     cudaDeviceSynchronize();
-
-    gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
-
-    cudaDeviceSynchronize();
+    if (Options::Simulation == "nvt")
+    {
+        gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
+        cudaDeviceSynchronize();
+    }
+    else if (Options::Simulation == "npt")
+    {
+        calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
+                                                   bin_size, kcut, num_bins);
+        cudaDeviceSynchronize();
+        std::cout << h_oc[0] << std::endl;
+    }
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
