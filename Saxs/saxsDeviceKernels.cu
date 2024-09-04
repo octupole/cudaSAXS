@@ -6,7 +6,7 @@
 #include "Ftypedefs.h"
 #include "opsfact.h"
 
-__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
+__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float qcut, int num_bins, float fact)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -40,19 +40,24 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
             float v0;
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            float nv0{2.0f};
-            v0 = (d_array[idx].x + d_array[idbx].x) * fact;
             if (i == 0 && j == 0 && k == 0)
             {
                 v0 = d_array[idx].x * fact;
-                nv0 = 1.0f;
+                double nv0{1.0};
+                atomicAdd(&d_histogram[h0], v0);
+                atomicAdd(&d_nhist[h0], nv0);
             }
-            atomicAdd(&d_histogram[h0], v0);
-            atomicAdd(&d_nhist[h0], nv0);
+            else
+            {
+                double nv0{2.0};
+                v0 = (d_array[idx].x + d_array[idbx].x) * fact;
+                atomicAdd(&d_histogram[h0], v0);
+                atomicAdd(&d_nhist[h0], nv0);
+            }
         }
     }
 }
-__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, float *d_nhist, float *oc, int nx, int ny, int nz,
+__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float qcut, int num_bins)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -87,15 +92,20 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
             float v0;
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
-            float nv0{2.0f};
-            v0 = d_array[idx].x + d_array[idbx].x;
             if (i == 0 && j == 0 && k == 0)
             {
                 v0 = d_array[idx].x;
-                nv0 = 1.0f;
+                double nv0{1.0};
+                atomicAdd(&d_histogram[h0], v0);
+                atomicAdd(&d_nhist[h0], nv0);
             }
-            atomicAdd(&d_histogram[h0], v0);
-            atomicAdd(&d_nhist[h0], nv0);
+            else
+            {
+                double nv0{2.0};
+                v0 = d_array[idx].x + d_array[idbx].x;
+                atomicAdd(&d_histogram[h0], v0);
+                atomicAdd(&d_nhist[h0], nv0);
+            }
         }
     }
 }
@@ -130,8 +140,10 @@ __global__ void modulusKernel(cuFloatComplex *grid_q, float *modX, float *modY, 
         float bsp_k = modZ[k];
         float bsp_ijk = bsp_i * bsp_j * bsp_k;
         cuFloatComplex bsp = make_cuComplex(bsp_ijk, 0.0f);
-        grid_q[idx] = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
-        grid_q[idx] = cuCmulf(grid_q[idx], bsp);
+        // grid_q[idx] = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
+        // grid_q[idx] = cuCmulf(grid_q[idx], bsp);
+        auto mod0 = cuCmulf(cuConjf(grid_q[idx]), grid_q[idx]);
+        grid_q[idx] = cuCmulf(mod0, bsp);
     }
 }
 /**
@@ -428,7 +440,8 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
     if (x < nx && y < ny && z < nz)
     {
         int idx = z + y * nz + x * nz * ny;
-        bool cond1 = (x > dx && x < mx) && (y > dy && y < my) && (z > dz && z < mz);
+        //        bool cond1 = (x > dx && x < mx) && (y > dy && y < my) && (z > dz && z < mz);
+        bool cond1 = (z > dz && z < mz);
         if (!cond1)
         {
             atomicAdd(&count[0], 1);

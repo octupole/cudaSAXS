@@ -16,10 +16,11 @@ int saxsKernel::frame_count = 0;
 
 void saxsKernel::getHistogram(std::vector<std::vector<float>> &oc)
 {
+    auto nnpz = nnz / 2 + 1;
     dim3 blockDim(npx, npy, npz);
     dim3 gridDim((nnx + blockDim.x - 1) / blockDim.x,
                  (nny + blockDim.y - 1) / blockDim.y,
-                 (nnz + blockDim.z - 1) / blockDim.z);
+                 (nnpz + blockDim.z - 1) / blockDim.z);
 
     float mySigma = (float)Options::nx / (float)Options::nnx;
 
@@ -81,11 +82,16 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     thrust::device_vector<float> d_oc_or = h_oc_or;
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
     float *d_oc_or_ptr = thrust::raw_pointer_cast(d_oc_or.data());
+    auto nnpz = nnz / 2 + 1;
 
     dim3 blockDim(npx, npy, npz);
+
     dim3 gridDim((nnx + blockDim.x - 1) / blockDim.x,
                  (nny + blockDim.y - 1) / blockDim.y,
-                 (nnz + blockDim.z - 1) / blockDim.z);
+                 (nnpz + blockDim.z - 1) / blockDim.z);
+    dim3 gridDimR((nnx + blockDim.x - 1) / blockDim.x,
+                  (nny + blockDim.y - 1) / blockDim.y,
+                  (nnz + blockDim.z - 1) / blockDim.z);
     dim3 gridDim0((nx + blockDim.x - 1) / blockDim.x,
                   (ny + blockDim.y - 1) / blockDim.y,
                   (nz + blockDim.z - 1) / blockDim.z);
@@ -110,12 +116,6 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     auto plan = this->getPlan();
     for (const auto &pair : index_map)
     {
-        thrust::host_vector<float> h_nato = {0.0f};
-        thrust::host_vector<float> h_Dens = {0.0f};
-        thrust::host_vector<int> h_count = {0};
-        thrust::device_vector<float> d_Dens = h_Dens;
-        thrust::device_vector<int> d_count = h_count;
-        thrust::device_vector<float> d_nato = h_nato;
 
         std::string type = pair.first;
         std::vector<int> value = pair.second;
@@ -152,6 +152,10 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         float myDens = 0.0f;
         if (Options::myPadding == padding::avg)
         {
+            thrust::host_vector<float> h_Dens = {0.0f};
+            thrust::host_vector<int> h_count = {0};
+            thrust::device_vector<float> d_Dens = h_Dens;
+            thrust::device_vector<int> d_count = h_count;
             paddingKernel<<<gridDim0, blockDim>>>(d_grid_ptr, nx, ny, nz, mx, my, mz,
                                                   thrust::raw_pointer_cast(d_Dens.data()),
                                                   thrust::raw_pointer_cast(d_count.data()));
@@ -173,13 +177,16 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
         zeroDensityKernel<<<numBlocksGridSuperC, THREADS_PER_BLOCK>>>(d_gridSupC_ptr, d_gridSupC.size());
         cudaDeviceSynchronize();
 
-        superDensityKernel<<<gridDim, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
+        superDensityKernel<<<gridDimR, blockDim>>>(d_grid_ptr, d_gridSup_ptr, myDens, nx, ny, nz, nnx, nny, nnz);
         // Synchronize the device
         cudaDeviceSynchronize();
 
         cufftExecR2C(plan, d_gridSup_ptr, d_gridSupC_ptr);
         // Synchronize the device
         cudaDeviceSynchronize();
+
+        thrust::host_vector<float> h_nato = {0.0f};
+        thrust::device_vector<float> d_nato = h_nato;
         scatterKernel<<<gridDim, blockDim>>>(d_gridSupC_ptr, d_gridSupAcc_ptr, d_oc_ptr, d_scatter_ptr, nnx, nny, nnz, kcut, thrust::raw_pointer_cast(d_nato.data()));
         cudaDeviceSynchronize();
         h_nato = d_nato;
@@ -192,9 +199,11 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     {
         gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
         cudaDeviceSynchronize();
+        frame_count++;
     }
     else if (Options::Simulation == "npt")
     {
+
         calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
                                                    bin_size, kcut, num_bins);
         cudaDeviceSynchronize();
@@ -211,19 +220,18 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     // Destroy the events
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    frame_count++;
 }
-std::vector<std::vector<float>> saxsKernel::getSaxs()
+std::vector<std::vector<double>> saxsKernel::getSaxs()
 {
+    std::vector<std::vector<double>> saxs;
+    h_histogram = d_histogram;
+    h_nhist = d_nhist;
 
-    std::vector<std::vector<float>> saxs;
-    thrust::host_vector<float> h_histogram = d_histogram;
-    thrust::host_vector<float> h_nhist = d_nhist;
     for (auto o{1}; o < h_histogram.size(); o++)
     {
         if (h_nhist[o] != 0.0f)
         {
-            vector<float> val = {o * this->bin_size, h_histogram[o] / h_nhist[o]};
+            vector<double> val = {o * this->bin_size, (double)h_histogram[o] / h_nhist[o]};
             saxs.push_back(val);
         }
     }
@@ -251,8 +259,8 @@ void saxsKernel::createMemory()
     this->kcut = Options::Qcut;
 
     this->num_bins = static_cast<int>(kcut / bin_size) + 1;
-    thrust::host_vector<float> h_histogram(num_bins, 0.0f);
-    thrust::host_vector<float> h_nhist(num_bins, 0.0f);
+    h_histogram = thrust::host_vector<float>(num_bins, 0.0f);
+    h_nhist = thrust::host_vector<long int>(num_bins, 0);
 
     d_histogram = h_histogram;
     d_nhist = h_nhist;

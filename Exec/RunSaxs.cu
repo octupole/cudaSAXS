@@ -132,7 +132,8 @@ void RunSaxs::Run(int beg, int end, int dt)
             std::cerr << "Python error: " << e.what() << std::endl;
         }
     }
-    std::vector<std::vector<float>> myhisto;
+    std::vector<std::vector<double>> myhisto;
+
     if (Options::Simulation == "nvt")
     {
         myKernel.getHistogram(oc);
@@ -142,9 +143,11 @@ void RunSaxs::Run(int beg, int end, int dt)
     myfile.open(Options::outFile);
     for (auto data : myhisto)
     {
-        myfile << data[0] << " " << data[1] << std::endl;
+        myfile << std::fixed << std::setw(10) << std::setprecision(5) << data[0];
+        myfile << std::scientific << std::setprecision(5) << std::setw(12) << data[1] << std::endl;
     }
     std::cout << "Done " << args.size() << " Steps " << std::endl;
+    std::cout << "Results written to  " << Options::outFile << std::endl;
     myfile.close();
     auto end0 = std::chrono::high_resolution_clock::now();
 

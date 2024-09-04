@@ -60,7 +60,7 @@ link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)  # For Pascal Volta, Turing, Ampere, Ampere and Ada Lovelace)
 
 # Enable optimization flags
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 128 -O3 -rdc=true -use_fast_math  -Xcompiler -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 128 -O3 -rdc=true  -Xcompiler -O3")
 
 add_subdirectory(fmt)
 add_subdirectory(Utilities)

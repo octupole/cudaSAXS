@@ -13,4 +13,4 @@ int Options::Sodium = 0, Options::Chlorine = 0;
 padding Options::myPadding = padding::avg;
 std::map<std::string, float> Options::myWmodel = {{"O", 0.0f}, {"H", 0.0f}, {"Na", 0.0f}, {"Cl", 0.0f}};
 std::string Options::outFile = "saxs.dat";
-std::string Options::Simulation = "nvt";
+std::string Options::Simulation = "npt";
