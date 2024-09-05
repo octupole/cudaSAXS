@@ -6,7 +6,7 @@
 #include "Ftypedefs.h"
 #include "opsfact.h"
 
-__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
+__global__ void calculate_histogram(cuFloatComplex *d_array, double *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float qcut, int num_bins, float fact)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -37,7 +37,7 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         int h0 = static_cast<int>(mw / bin_size);
         if (h0 < num_bins)
         {
-            float v0;
+            double v0;
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
             if (i == 0 && j == 0 && k == 0)
@@ -57,7 +57,7 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         }
     }
 }
-__global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
+__global__ void calculate_histogram(cuFloatComplex *d_array, double *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float qcut, int num_bins)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -89,7 +89,7 @@ __global__ void calculate_histogram(cuFloatComplex *d_array, float *d_histogram,
         int h0 = static_cast<int>(mw / bin_size);
         if (h0 < num_bins)
         {
-            float v0;
+            double v0;
             int idx = k + j * npz + i * npz * ny;
             int idbx = k + jb * npz + ib * npz * ny;
             if (i == 0 && j == 0 && k == 0)
@@ -434,8 +434,8 @@ __global__ void paddingKernel(float *grid, int nx, int ny, int nz, int dx, int d
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
     int z = blockIdx.z * blockDim.z + threadIdx.z;
-    int mx = nx - dx;
-    int my = ny - dy;
+    // int mx = nx - dx;
+    // int my = ny - dy;
     int mz = nz - dz;
     if (x < nx && y < ny && z < nz)
     {

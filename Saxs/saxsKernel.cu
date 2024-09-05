@@ -231,7 +231,7 @@ std::vector<std::vector<double>> saxsKernel::getSaxs()
     {
         if (h_nhist[o] != 0.0f)
         {
-            vector<double> val = {o * this->bin_size, (double)h_histogram[o] / h_nhist[o]};
+            vector<double> val = {o * this->bin_size, h_histogram[o] / h_nhist[o]};
             saxs.push_back(val);
         }
     }

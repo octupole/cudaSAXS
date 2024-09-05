@@ -84,13 +84,13 @@ private:
     thrust::device_vector<cuFloatComplex> d_gridSupAcc;
     thrust::device_vector<cuFloatComplex> d_Iq;
     thrust::device_vector<cuFloatComplex> d_gridSupC;
-    thrust::device_vector<float> d_histogram;
+    thrust::device_vector<double> d_histogram;
     thrust::device_vector<double> d_nhist;
 
     thrust::host_vector<float> h_moduleX;
     thrust::host_vector<float> h_moduleY;
     thrust::host_vector<float> h_moduleZ;
-    thrust::host_vector<float> h_histogram;
+    thrust::host_vector<double> h_histogram;
     thrust::host_vector<double> h_nhist;
 
     float *d_grid_ptr{nullptr};
@@ -102,7 +102,7 @@ private:
     float *d_moduleX_ptr{nullptr};
     float *d_moduleY_ptr{nullptr};
     float *d_moduleZ_ptr{nullptr};
-    float *d_histogram_ptr{nullptr};
+    double *d_histogram_ptr{nullptr};
     double *d_nhist_ptr{nullptr};
     std::function<int(int, float)> borderBins = [](int nx, float shell) -> int
     {
