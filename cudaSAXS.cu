@@ -101,6 +101,8 @@ int main(int argc, char *argv[])
     // Add optional for constant pressure simulation
     app.add_option("--simulation, --simu", Options::Simulation, "Valid values are npt and nvt");
 
+    app.add_flag("-c,--corr", Options::densityCorr, "Enable verbose mode");
+
     // Add help option
     app.set_help_flag("-h,--help", "Print usage");
 

@@ -30,6 +30,7 @@ public:
     static std::map<std::string, float> myWmodel;
     static std::string outFile;
     static std::string Simulation;
+    static bool densityCorr;
 
 private:
     Options() {};

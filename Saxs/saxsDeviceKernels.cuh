@@ -16,6 +16,8 @@
 #include <fmt/core.h>
 void scatterCalculation(cuFloatComplex *grid_q, cuFloatComplex *grid_oq, float *oc,
                         float *Scatter, int nnx, int nny, int nnz, float qcut);
+__global__ void calculate_histogram(float *d_array, double *d_histogram, double *nhist, float *co, int nx, int ny, int nz,
+                                    float bin_size, int num_bins);
 __global__ void calculate_histogram(cuFloatComplex *d_array, double *d_histogram, double *nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float Qcut, int num_bins, float fact);
 __global__ void calculate_histogram(cuFloatComplex *d_array, double *d_histogram, double *nhist, float *oc, int nx, int ny, int nz,

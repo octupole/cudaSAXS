@@ -56,7 +56,8 @@ void saxsKernel::zeroIq()
  * @param index_map A map of particle indices, where the keys are particle types and the values are vectors of indices.
  * @param oc The orientation matrix.
  */
-void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map, std::vector<std::vector<float>> &oc)
+void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float>> &coords, std::map<std::string, std::vector<int>> &index_map,
+                            std::vector<std::vector<float>> &co, std::vector<std::vector<float>> &oc)
 {
 
     // Cudaevents
@@ -70,16 +71,24 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     int mz = borderBins(nz, SHELL);
     float mySigma = (float)Options::nx / (float)Options::nnx;
 
+    thrust::host_vector<float> h_co(DIM * DIM);
+    thrust::host_vector<float> h_co_or(DIM * DIM);
     thrust::host_vector<float> h_oc(DIM * DIM);
     thrust::host_vector<float> h_oc_or(DIM * DIM);
     for (int i = 0; i < DIM; ++i)
         for (int j = 0; j < DIM; ++j)
         {
+            h_co[i * DIM + j] = co[i][j] / mySigma;
+            h_co_or[i * DIM + j] = co[i][j];
             h_oc[i * DIM + j] = mySigma * oc[i][j];
             h_oc_or[i * DIM + j] = oc[i][j];
         }
+    thrust::device_vector<float> d_co = h_co;
+    thrust::device_vector<float> d_co_or = h_co_or;
     thrust::device_vector<float> d_oc = h_oc;
     thrust::device_vector<float> d_oc_or = h_oc_or;
+    float *d_co_ptr = thrust::raw_pointer_cast(d_co.data());
+    float *d_co_or_ptr = thrust::raw_pointer_cast(d_co_or.data());
     float *d_oc_ptr = thrust::raw_pointer_cast(d_oc.data());
     float *d_oc_or_ptr = thrust::raw_pointer_cast(d_oc_or.data());
     auto nnpz = nnz / 2 + 1;
@@ -114,6 +123,7 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     float N2 = (float)nny / (float)ny;
     float N3 = (float)nnz / (float)nz;
     auto plan = this->getPlan();
+    auto planR = this->getPlanR();
     for (const auto &pair : index_map)
     {
 
@@ -195,18 +205,28 @@ void saxsKernel::runPKernel(int frame, float Time, std::vector<std::vector<float
     modulusKernel<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_moduleX_ptr, d_moduleY_ptr, d_moduleZ_ptr, nnx, nny, nnz);
     // // Synchronize the device
     cudaDeviceSynchronize();
-    if (Options::Simulation == "nvt")
+    if (Options::densityCorr)
     {
-        gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
+        cufftExecC2R(planR, d_gridSupAcc_ptr, d_gridSup_ptr);
+        calculate_histogram<<<gridDimR, blockDim>>>(d_gridSup_ptr, d_histogram_ptr, d_nhist_ptr, d_co_ptr, nnx, nny, nnz,
+                                                    bin_size, num_bins);
         cudaDeviceSynchronize();
-        frame_count++;
     }
-    else if (Options::Simulation == "npt")
+    else
     {
+        if (Options::Simulation == "nvt")
+        {
+            gridAddKernel<<<numBlocksGridIq, THREADS_PER_BLOCK>>>(d_gridSupAcc_ptr, d_Iq_ptr, d_Iq.size());
+            cudaDeviceSynchronize();
+            frame_count++;
+        }
+        else if (Options::Simulation == "npt")
+        {
 
-        calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
-                                                   bin_size, kcut, num_bins);
-        cudaDeviceSynchronize();
+            calculate_histogram<<<gridDim, blockDim>>>(d_gridSupAcc_ptr, d_histogram_ptr, d_nhist_ptr, d_oc_ptr, nnx, nny, nnz,
+                                                       bin_size, kcut, num_bins);
+            cudaDeviceSynchronize();
+        }
     }
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -257,10 +277,11 @@ void saxsKernel::createMemory()
 
     this->bin_size = Options::Dq;
     this->kcut = Options::Qcut;
-
+    std::cout << "bin_size = " << bin_size << std::endl;
     this->num_bins = static_cast<int>(kcut / bin_size) + 1;
     h_histogram = thrust::host_vector<float>(num_bins, 0.0f);
     h_nhist = thrust::host_vector<long int>(num_bins, 0);
+    std::cout << "num_bin = " << num_bins << std::endl;
 
     d_histogram = h_histogram;
     d_nhist = h_nhist;
@@ -383,37 +404,69 @@ void saxsKernel::resetHistogramParameters(std::vector<std::vector<float>> &oc)
     using namespace std;
     auto qcut = Options::Qcut;
     auto dq = Options::Dq;
-    int nfx{(nnx % 2 == 0) ? nnx / 2 : nnx / 2 + 1};
-    int nfy{(nny % 2 == 0) ? nny / 2 : nny / 2 + 1};
-    int nfz{(nnz % 2 == 0) ? nnz / 2 : nnz / 2 + 1};
-    float argx{2.0f * (float)M_PI * oc[XX][XX] / sigma};
-    float argy{2.0f * (float)M_PI * oc[YY][YY] / sigma};
-    float argz{2.0f * (float)M_PI * oc[ZZ][ZZ] / sigma};
-
-    std::vector<float> fx{(float)nfx - 1, (float)nfy - 1, (float)nfz - 1};
-
-    vector<float> mydq0 = {argx, argy, argz, dq};
-    vector<float> mycut0 = {argx * fx[XX], argy * fx[YY], argz * fx[ZZ], qcut};
-
-    dq = (*std::max_element(mydq0.begin(), mydq0.end()));
-    qcut = *std::min_element(mycut0.begin(), mycut0.end());
-    if (qcut != Options::Qcut)
+    if (Options::densityCorr)
     {
-        std::string formatted_string = fmt::format("----- Qcut had to be reset to {:.2f} from  {:.2f} ----", qcut, Options::Qcut);
-        std::cout << "\n--------------------------------------------------\n";
-        std::cout << formatted_string << "\n";
-        std::cout << "--------------------------------------------------\n\n";
+        dq = Options::Dq;
+        qcut = Options::Qcut;
+        if (dq < 1.0f)
+            dq = 1.0f;
+        float mySigma = (float)Options::nx / (float)Options::nnx;
 
-        Options::Qcut = qcut;
+        qcut = oc[ZZ][ZZ] / mySigma;
+        if (qcut != Options::Qcut)
+        {
+            std::string formatted_string = fmt::format("----- Qcut had to be reset to {:.2f} from  {:.2f} ----", qcut, Options::Qcut);
+            std::cout << "\n--------------------------------------------------\n";
+            std::cout << formatted_string << "\n";
+            std::cout << "--------------------------------------------------\n\n";
+
+            Options::Qcut = qcut;
+        }
+        if (dq != Options::Dq)
+        {
+            std::string formatted_string = fmt::format("----- Dq had to be reset to {:.3f} from  {:.3f} ----", dq, Options::Dq);
+            std::cout << "\n--------------------------------------------------\n";
+            std::cout << formatted_string << "\n";
+            std::cout << "--------------------------------------------------\n\n";
+
+            Options::Dq = dq;
+        }
     }
-    if (dq != Options::Dq)
+    else
     {
-        std::string formatted_string = fmt::format("----- Dq had to be reset to {:.3f} from  {:.3f} ----", dq, Options::Dq);
-        std::cout << "\n--------------------------------------------------\n";
-        std::cout << formatted_string << "\n";
-        std::cout << "--------------------------------------------------\n\n";
 
-        Options::Dq = dq;
+        int nfx{(nnx % 2 == 0) ? nnx / 2 : nnx / 2 + 1};
+        int nfy{(nny % 2 == 0) ? nny / 2 : nny / 2 + 1};
+        int nfz{(nnz % 2 == 0) ? nnz / 2 : nnz / 2 + 1};
+        float argx{2.0f * (float)M_PI * oc[XX][XX] / sigma};
+        float argy{2.0f * (float)M_PI * oc[YY][YY] / sigma};
+        float argz{2.0f * (float)M_PI * oc[ZZ][ZZ] / sigma};
+
+        std::vector<float> fx{(float)nfx - 1, (float)nfy - 1, (float)nfz - 1};
+
+        vector<float> mydq0 = {argx, argy, argz, dq};
+        vector<float> mycut0 = {argx * fx[XX], argy * fx[YY], argz * fx[ZZ], qcut};
+
+        dq = (*std::max_element(mydq0.begin(), mydq0.end()));
+        qcut = *std::min_element(mycut0.begin(), mycut0.end());
+        if (qcut != Options::Qcut)
+        {
+            std::string formatted_string = fmt::format("----- Qcut had to be reset to {:.2f} from  {:.2f} ----", qcut, Options::Qcut);
+            std::cout << "\n--------------------------------------------------\n";
+            std::cout << formatted_string << "\n";
+            std::cout << "--------------------------------------------------\n\n";
+
+            Options::Qcut = qcut;
+        }
+        if (dq != Options::Dq)
+        {
+            std::string formatted_string = fmt::format("----- Dq had to be reset to {:.3f} from  {:.3f} ----", dq, Options::Dq);
+            std::cout << "\n--------------------------------------------------\n";
+            std::cout << formatted_string << "\n";
+            std::cout << "--------------------------------------------------\n\n";
+
+            Options::Dq = dq;
+        }
     }
 }
 void saxsKernel::writeBanner()

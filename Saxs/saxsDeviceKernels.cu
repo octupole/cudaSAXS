@@ -5,6 +5,30 @@
 #include "Splines.h"
 #include "Ftypedefs.h"
 #include "opsfact.h"
+__global__ void calculate_histogram(float *d_array, double *d_histogram, double *d_nhist, float *co, int nx, int ny, int nz,
+                                    float bin_size, int num_bins)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    if (i < nx && j < ny && k < nz)
+    {
+        int nfz = (nz % 2 == 0) ? nz / 2 : nz / 2 + 1;
+        int ka = (k < nfz) ? k : k - nz;
+        int idx = k + j * nz + i * nz * ny;
+        int idx0 = j * nz + i * nz * ny;
+        float dz = 0.5f + (float)ka / (float)nz;
+        auto mw3 = co[ZZ * DIM + ZZ] * dz;
+
+        int h0 = mw3 / bin_size;
+        if (h0 < num_bins)
+        {
+            auto v0 = d_array[idx] / d_array[idx0];
+            atomicAdd(&d_histogram[h0], v0);
+            atomicAdd(&d_nhist[h0], 1.0);
+        }
+    }
+}
 
 __global__ void calculate_histogram(cuFloatComplex *d_array, double *d_histogram, double *d_nhist, float *oc, int nx, int ny, int nz,
                                     float bin_size, float qcut, int num_bins, float fact)

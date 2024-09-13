@@ -85,6 +85,7 @@ void RunSaxs::Run(int beg, int end, int dt)
     auto box_dimensions = analyzer.attr("get_box")().cast<std::vector<std::vector<float>>>();
     Cell::calculateMatrices(box_dimensions);
     auto oc = Cell::getOC();
+    auto co = Cell::getCO();
     if (Options::myPadding == padding::given)
     {
         if (index_map.find("Na") != index_map.end() && Options::Sodium == 0)
@@ -103,11 +104,18 @@ void RunSaxs::Run(int beg, int end, int dt)
                 pair.second = 0.0f;
         }
     }
-
-    myKernel.resetHistogramParameters(oc);
+    if (Options::densityCorr)
+    {
+        myKernel.resetHistogramParameters(co);
+    }
+    else
+    {
+        myKernel.resetHistogramParameters(oc);
+    }
     myKernel.createMemory();
     myKernel.writeBanner();
     myKernel.setcufftPlan(Options::nnx, Options::nny, Options::nnz);
+    myKernel.setcufftPlanR(Options::nnx, Options::nny, Options::nnz);
 
     for (auto frame : args)
     {
@@ -124,7 +132,7 @@ void RunSaxs::Run(int beg, int end, int dt)
             Cell::calculateMatrices(box_dimensions);
             auto co = Cell::getCO();
             auto oc = Cell::getOC();
-            myKernel.runPKernel(frame, simTime, coords, index_map, oc);
+            myKernel.runPKernel(frame, simTime, coords, index_map, co, oc);
         }
 
         catch (const py::error_already_set &e)

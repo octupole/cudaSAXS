@@ -43,7 +43,7 @@ public:
         npy = _npx;
         npz = _npx;
     }
-    void runPKernel(int, float, std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &);
+    void runPKernel(int, float, std::vector<std::vector<float>> &, std::map<std::string, std::vector<int>> &, std::vector<std::vector<float>> &, std::vector<std::vector<float>> &);
     double getCudaTime() { return cudaTime / cudaCalls; }
     void scaledCell();
     void zeroIq();
@@ -56,7 +56,12 @@ public:
     {
         cufftPlan3d(&cufftPlan, nnx, nny, nnz, CUFFT_R2C);
     }
+    void setcufftPlanR(int nnx, int nny, int nnz)
+    {
+        cufftPlan3d(&cufftPlanR, nnx, nny, nnz, CUFFT_C2R);
+    }
     cufftHandle &getPlan() { return cufftPlan; }
+    cufftHandle &getPlanR() { return cufftPlanR; }
 
     ~saxsKernel();
 
@@ -75,6 +80,7 @@ private:
     double cudaCalls{0};
     static int frame_count;
     cufftHandle cufftPlan;
+    cufftHandle cufftPlanR;
 
     thrust::device_vector<float> d_moduleX;
     thrust::device_vector<float> d_moduleY;
