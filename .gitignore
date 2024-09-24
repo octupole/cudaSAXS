@@ -53,6 +53,7 @@ python/openTRJ.egg-info/requires.txt
 /Release/
 .venv
 .vscode
+.cache
 /data/
 /build/
 /src/build/
