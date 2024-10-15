@@ -29,7 +29,7 @@ set(CMAKE_CXX_STANDARD 14)
 # Find Python and pybind11
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/opt/anaconda3/envs/cudasaxs/share/cmake/pybind11")
+set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};/opt/miniforge3/envs/cudasaxs/share/cmake/pybind11")
 find_package(pybind11 REQUIRED)
 
 
