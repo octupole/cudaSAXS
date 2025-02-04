@@ -103,12 +103,10 @@ void RunSaxs::Run(int beg, int end, int dt)
                 pair.second = 0.0f;
         }
     }
-
     myKernel.resetHistogramParameters(oc);
     myKernel.createMemory();
     myKernel.writeBanner();
     myKernel.setcufftPlan(Options::nnx, Options::nny, Options::nnz);
-
     for (auto frame : args)
     {
 

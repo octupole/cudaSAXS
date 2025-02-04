@@ -45,15 +45,17 @@ import sys
 import numpy as np
 import time
 import warnings
-        
+
+
 class Topology:
-    def __init__(self, tpr_file,xtc_file):
+    def __init__(self, tpr_file, xtc_file):
         """
         Initializes the MoleculeCounter with the given TPR and XTC files.
         """
-        warnings.filterwarnings("ignore", message="No coordinate reader found for", category=UserWarning)        
+        warnings.filterwarnings(
+            "ignore", message="No coordinate reader found for", category=UserWarning)
         self.tpr_file = tpr_file
-        self.universe = mda.Universe(tpr_file)
+        self.universe = mda.Universe(tpr_file, xtc_file)
         self.G = nx.Graph()
         self.molecules = []
         self.protein_molecules = []
@@ -62,7 +64,6 @@ class Topology:
         self.other_molecules = []
         self.__build_graph()
         self.__classify_molecules()
-        self.xtc=XTCFile(xtc_file)
         print("Initialized Topology")
 
     def __build_graph(self):
@@ -84,12 +85,15 @@ class Topology:
         """
         # Select residues for different types of molecules
         protein_residues = set(self.universe.select_atoms('protein').residues)
-        water_residues = set(self.universe.select_atoms('resname TIP3 TIP4 SOL WAT').residues)
-        ion_residues = set(self.universe.select_atoms('resname NA CL K CA MG').residues)
+        water_residues = set(self.universe.select_atoms(
+            'resname TIP3 TIP4 SOL WAT').residues)
+        ion_residues = set(self.universe.select_atoms(
+            'resname NA CL K CA MG').residues)
 
         # Classify each molecule based on its residues
         for molecule in self.molecules:
-            molecule_residues = set(self.universe.atoms[list(molecule)].residues)
+            molecule_residues = set(
+                self.universe.atoms[list(molecule)].residues)
             if molecule_residues & protein_residues:
                 self.protein_molecules.append(molecule)
             elif molecule_residues & water_residues:
@@ -98,8 +102,9 @@ class Topology:
                 self.ion_molecules.append(molecule)
             else:
                 self.other_molecules.append(molecule)
-        self.protein_atoms = self.universe.atoms[list(set().union(*self.protein_molecules))]
-        
+        self.protein_atoms = self.universe.atoms[list(
+            set().union(*self.protein_molecules))]
+
     def count_molecules(self):
         """
         Counts the total number of molecules and categorizes them.
@@ -138,46 +143,46 @@ class Topology:
             molecule_dict['others'][f'{i}'] = list(molecule)
 
         return molecule_dict
- 
+
     def get_atom_index(self):
-        atom_index={}
+        atom_index = {}
         for atom in self.universe.atoms:
             atom_type = atom.element
             if atom_type not in atom_index:
                 atom_index[atom_type] = []
-            atoms2=atom.index
+            atoms2 = atom.index
             atom_index[atom_type].append(atoms2)
-        return atom_index            
-    
-    def read_frame(self,frame_number):
-        self.xtc.seek(frame_number)
-        self.frame=self.xtc.read()
-    
+        return atom_index
+
+    def read_frame(self, frame_number):
+        self.ts = self.universe.trajectory[frame_number]
+
     def get_box(self):
-        return self.frame.box
-    
+        return self.ts.triclinic_dimensions/10.0
+
     def get_step(self):
-        return self.frame.step
-    
+        return self.ts.frame
+
     def get_time(self):
-        return self.frame.time
+        return self.ts.time
 
     def get_coordinates(self):
-        return self.frame.x 
-    
-        
+        return self.universe.atoms.positions/10.0
+
 
 def main():
     """
     Main function to parse arguments and initiate molecule counting.
     """
-    parser = argparse.ArgumentParser(description='Read TPR and XTC files and count the number of molecules in the system.')
+    parser = argparse.ArgumentParser(
+        description='Read TPR and XTC files and count the number of molecules in the system.')
     parser.add_argument('-s', '--tpr', type=str, help='Path to the TPR file')
     parser.add_argument('-x', '--xtc', type=str, help='Path to the XTC file')
-    parser.add_argument('-o', '--output', type=str, help='Output PDB file', default='centered_structure.pdb')
+    parser.add_argument('-o', '--output', type=str,
+                        help='Output PDB file', default='centered_structure.pdb')
 
     args = parser.parse_args()
-    
+
     # Check if both arguments are provided
     if not args.tpr or not args.xtc:
         parser.error("XTC and TPR file file must be provided.")
@@ -185,8 +190,9 @@ def main():
 
     # Initialize MoleculeCounter and count molecules
     top = Topology(args.tpr, args.xtc)
-    
-    ( num_molecules, num_proteins, num_waters, num_ions, num_others) = top.count_molecules()
+
+    (num_molecules, num_proteins, num_waters,
+     num_ions, num_others) = top.count_molecules()
 
     # Print the results
     print(f'Total number of molecules: {num_molecules}')
@@ -195,11 +201,11 @@ def main():
     print(f'Number of ion molecules: {num_ions}')
     if num_others:
         print(f'Number of other molecules: {num_others}')
-        
-    atom_indesx=top.get_atom_index()
+
+    atom_indesx = top.get_atom_index()
     top.read_frame(10)
-    box=top.get_box()
-    print(top.frame.box[0])    
+    box = top.get_box()
+    print(top.frame.box[0])
     # for i in range(0,200,20):
     #     print(i)
     #     top.read_frame(i)
@@ -214,7 +220,6 @@ def main():
     #     if o>200:
     #         break
     #     o+=1
-    
 
     # # Generate and print the molecule dictionary
     # molecule_dict = traj.generate_molecule_dict()
@@ -225,11 +230,11 @@ def main():
 
     # Center the structure on the protein barycenter and apply periodic boundary conditions
     # Write the centered structure to a PDB file
-    ##traj.write_pdb(1000, args.output)
-    
+    # traj.write_pdb(1000, args.output)
 
     exit(1)
     print(f"Centered structure written to {args.output}")
+
 
 if __name__ == "__main__":
     main()
