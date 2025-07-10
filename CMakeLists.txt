@@ -19,7 +19,7 @@
  * - Adds a compile definition for the Python source directory.
  * - Prints debugging messages for the include and library directories.
 ]]
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 #list(APPEND CMAKE_PREFIX_PATH "/opt/anaconda3/envs/openSAXS")
 project(cudaSAXS LANGUAGES CXX C CUDA)
 # Specify the CUDA and C++ standard
