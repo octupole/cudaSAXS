@@ -17,7 +17,7 @@
  * The PY_SOURCE_DIR compile definition is also set to the pysrc directory within the project source directory.
  ]]
 # Policy
-cmake_minimum_required( VERSION 3.0) 
+cmake_minimum_required( VERSION 3.18) 
 
 
 if (NOT CMAKE_BUILD_TYPE)

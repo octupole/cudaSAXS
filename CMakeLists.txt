@@ -69,6 +69,12 @@ add_subdirectory(System)
 add_subdirectory(Saxs)
 add_subdirectory(Exec)
 
+option(BUILD_GUI "Build the Qt GUI for cudaSAXS" ON)
+if(BUILD_GUI)
+    add_subdirectory(gui)
+endif()
+
+
 # Specify the target executable
 add_executable(cudaSAXS cudaSAXS.cu )
 

@@ -7,7 +7,7 @@
  * and defines a compile definition for the Python source directory.
 ]]
 # Policy
-cmake_minimum_required( VERSION 3.0) 
+cmake_minimum_required( VERSION 3.18) 
 
 
 if (NOT CMAKE_BUILD_TYPE)
