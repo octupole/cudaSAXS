@@ -57,10 +57,11 @@ include_directories(${pybind11_INCLUDE_DIRS})
 link_directories(${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 
 # Set the CUDA architectures you want to support
-set(CMAKE_CUDA_ARCHITECTURES 60 70 75 80 86 89)  # For Pascal Volta, Turing, Ampere, Ampere and Ada Lovelace)
+set(CMAKE_CUDA_ARCHITECTURES 75 80 86 89)  # For Pascal Volta, Turing, Ampere, Ampere and Ada Lovelace)
 
 # Enable optimization flags
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 128 -O3 -rdc=true  -Xcompiler -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress 2417 -diag-suppress 128 -O3 -rdc=true  -Xcompiler -O3")
+
 
 add_subdirectory(fmt)
 add_subdirectory(Utilities)
@@ -71,7 +72,7 @@ add_subdirectory(Exec)
 # Specify the target executable
 add_executable(cudaSAXS cudaSAXS.cu )
 
-target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT_SOURCE_DIR}/System ")
+target_include_directories(cudaSAXS PUBLIC "${PROJECT_SOURCE_DIR}/Exec ${PROJECT_SOURCE_DIR}/System")
 
 # Enable C++ and CUDA compilation
 set_target_properties(cudaSAXS PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
