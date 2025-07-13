@@ -6,13 +6,14 @@
 #include "OptionsData.h"
 
 QT_BEGIN_NAMESPACE
-class QTextEdit;
-class QProgressBar;
+namespace Ui
+{
+    class MainWindow;
+}
 class QLabel;
-class QAction;
+class QProgressBar;
 QT_END_NAMESPACE
 
-class InputForm;
 class ProcessRunner;
 class AdvancedOptionsDialog;
 
@@ -47,18 +48,12 @@ private slots:
 
 private:
     void setupUI();
-    void createMenus();
-    void createStatusBar();
     void connectSignals();
 
     void loadProject(const QString &filename);
     void saveProject(const QString &filename);
 
-    // Central widget
-    InputForm *m_inputForm;
-
-    // Output dock
-    QTextEdit *m_outputText;
+    Ui::MainWindow *ui;
 
     // Process runner
     ProcessRunner *m_processRunner;
@@ -77,11 +72,6 @@ private:
 
     // Current project file
     QString m_projectFile;
-
-    // Menu actions
-    QAction *m_runAction;
-    QAction *m_stopAction;
-    QAction *m_saveAction;
 };
 
 #endif // MAINWINDOW_H

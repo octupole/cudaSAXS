@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 project(cudaSAXS_GUI)
 
 # Find Qt6 or Qt5
@@ -17,8 +17,19 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Tell AUTOUIC where to find .ui files
+set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/ui)
+
 # Include directories
 include_directories(include)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}) # For UI generated headers
+
+# UI files
+set(UI_FILES
+    ui/MainWindow.ui
+    ui/InputForm.ui
+    ui/AdvancedOptionsDialog.ui
+)
 
 # Source files
 set(SOURCES
@@ -40,7 +51,7 @@ set(HEADERS
 )
 
 # Create executable
-add_executable(cudaSAXS_GUI ${SOURCES} ${HEADERS})
+add_executable(cudaSAXS_GUI ${SOURCES} ${HEADERS} ${UI_FILES})
 
 # Link Qt libraries
 if(QT_VERSION_MAJOR EQUAL 6)
