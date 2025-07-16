@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="windowTitle">
+   <string>cudaSAXS GUI</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <!-- Placeholder for InputForm -->
+     <widget class="QWidget" name="inputFormPlaceholder" native="true"/>
+    </item>
+    <item>
+     <!-- Output log (QTextEdit) -->
+     <widget class="QTextEdit" name="textEdit_output"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <addaction name="menuFile"/>
+   <addaction name="menuProject"/>
+   <addaction name="menuTools"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <addaction name="actionRun"/>
+   <addaction name="actionAdvancedOptions"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionNew">
+   <property name="text">
+    <string>New</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>Open</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>Save</string>
+   </property>
+  </action>
+  <action name="actionSaveAs">
+   <property name="text">
+    <string>Save As</string>
+   </property>
+  </action>
+  <action name="actionPreferences">
+   <property name="text">
+    <string>Preferences</string>
+   </property>
+  </action>
+  <action name="actionRun">
+   <property name="text">
+    <string>Run</string>
+   </property>
+  </action>
+  <action name="actionAdvancedOptions">
+   <property name="text">
+    <string>Advanced Options...</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About</string>
+   </property>
+  </action>
+  <!-- Menus -->
+  <widget class="QMenu" name="menuFile">
+   <property name="title">
+    <string>&amp;File</string>
+   </property>
+   <addaction name="actionNew"/>
+   <addaction name="actionOpen"/>
+   <addaction name="actionSave"/>
+   <addaction name="actionSaveAs"/>
+   <addaction name="actionPreferences"/>
+  </widget>
+  <widget class="QMenu" name="menuProject">
+   <property name="title">
+    <string>&amp;Project</string>
+   </property>
+   <addaction name="actionRun"/>
+  </widget>
+  <widget class="QMenu" name="menuTools">
+   <property name="title">
+    <string>&amp;Tools</string>
+   </property>
+   <addaction name="actionAdvancedOptions"/>
+  </widget>
+  <widget class="QMenu" name="menuHelp">
+   <property name="title">
+    <string>&amp;Help</string>
+   </property>
+   <addaction name="actionAbout"/>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

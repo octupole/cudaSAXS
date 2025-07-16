@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>InputForm</class>
+ <widget class="QWidget" name="InputForm">
+  <property name="windowTitle">
+   <string>Input Form</string>
+  </property>
+  <layout class="QFormLayout" name="formLayout">
+   <item row="0" column="0">
+    <widget class="QLabel" name="label_inputFile">
+     <property name="text">
+      <string>Input File:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QLineEdit" name="lineEdit_inputFile"/>
+   </item>
+   <item row="0" column="2">
+    <widget class="QPushButton" name="pushButton_browse">
+     <property name="text">
+      <string>Browse...</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_param1">
+     <property name="text">
+      <string>Parameter 1:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1" colspan="2">
+    <widget class="QLineEdit" name="lineEdit_param1"/>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_param2">
+     <property name="text">
+      <string>Parameter 2:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1" colspan="2">
+    <widget class="QLineEdit" name="lineEdit_param2"/>
+   </item>
+   <item row="3" column="0" colspan="3">
+    <widget class="QPushButton" name="pushButton_run">
+     <property name="text">
+      <string>Run</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
