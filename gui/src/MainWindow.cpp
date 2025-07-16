@@ -1,16 +1,10 @@
 #include "MainWindow.h"
+#include "ui_MainWindow.h"
 #include "InputForm.h"
 #include "ProcessRunner.h"
 #include "AdvancedOptionsDialog.h"
-#include <QMenuBar>
-#include <QMenu>
-#include <QAction>
-#include <QToolBar>
-#include <QStatusBar>
-#include <QDockWidget>
-#include <QTextEdit>
-#include <QProgressBar>
 #include <QLabel>
+#include <QProgressBar>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QSettings>
@@ -23,18 +17,15 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
+      ui(new Ui::MainWindow),
       m_processRunner(new ProcessRunner(this)),
       m_advancedDialog(new AdvancedOptionsDialog(this)),
       m_elapsedTimer(new QTimer(this)),
       m_startTime(0)
 {
 
-    setWindowTitle("cudaSAXS GUI");
-    resize(800, 600);
-
+    ui->setupUi(this);
     setupUI();
-    createMenus();
-    createStatusBar();
     connectSignals();
 
     // Load settings
@@ -53,114 +44,46 @@ MainWindow::~MainWindow()
     QSettings settings("cudaSAXS", "GUI");
     settings.setValue("geometry", saveGeometry());
     settings.setValue("windowState", saveState());
+
+    delete ui;
 }
 
 void MainWindow::setupUI()
 {
-    // Central widget
-    m_inputForm = new InputForm(this);
-    setCentralWidget(m_inputForm);
-
-    // Output dock
-    auto outputDock = new QDockWidget("Output", this);
-    m_outputText = new QTextEdit;
-    m_outputText->setReadOnly(true);
-    m_outputText->setFont(QFont("Consolas", 9));
-    outputDock->setWidget(m_outputText);
-    addDockWidget(Qt::BottomDockWidgetArea, outputDock);
-}
-
-void MainWindow::createMenus()
-{
-    // File menu
-    auto fileMenu = menuBar()->addMenu("&File");
-
-    auto newAction = fileMenu->addAction("&New Project");
-    newAction->setShortcut(QKeySequence::New);
-    connect(newAction, &QAction::triggered, this, &MainWindow::onNewProject);
-
-    auto openAction = fileMenu->addAction("&Open Project...");
-    openAction->setShortcut(QKeySequence::Open);
-    connect(openAction, &QAction::triggered, this, &MainWindow::onOpenProject);
-
-    fileMenu->addSeparator();
-
-    m_saveAction = fileMenu->addAction("&Save Project");
-    m_saveAction->setShortcut(QKeySequence::Save);
-    connect(m_saveAction, &QAction::triggered, this, &MainWindow::onSaveProject);
-
-    auto saveAsAction = fileMenu->addAction("Save Project &As...");
-    saveAsAction->setShortcut(QKeySequence::SaveAs);
-    connect(saveAsAction, &QAction::triggered, this, &MainWindow::onSaveProjectAs);
-
-    fileMenu->addSeparator();
-
-    auto exitAction = fileMenu->addAction("E&xit");
-    exitAction->setShortcut(QKeySequence::Quit);
-    connect(exitAction, &QAction::triggered, this, &QWidget::close);
-
-    // Run menu
-    auto runMenu = menuBar()->addMenu("&Run");
-
-    m_runAction = runMenu->addAction("&Run SAXS");
-    m_runAction->setShortcut(Qt::Key_F5);
-    connect(m_runAction, &QAction::triggered, this, &MainWindow::onRunRequested);
-
-    m_stopAction = runMenu->addAction("&Stop");
-    m_stopAction->setShortcut(Qt::Key_F6);
-    m_stopAction->setEnabled(false);
-    connect(m_stopAction, &QAction::triggered, m_processRunner, &ProcessRunner::cancel);
-
-    // Tools menu
-    auto toolsMenu = menuBar()->addMenu("&Tools");
-
-    auto advancedAction = toolsMenu->addAction("&Advanced Options...");
-    connect(advancedAction, &QAction::triggered, this, &MainWindow::onAdvancedOptionsRequested);
-
-    toolsMenu->addSeparator();
-
-    auto prefsAction = toolsMenu->addAction("&Preferences...");
-    connect(prefsAction, &QAction::triggered, this, &MainWindow::onPreferences);
-
-    // Help menu
-    auto helpMenu = menuBar()->addMenu("&Help");
-
-    auto aboutAction = helpMenu->addAction("&About...");
-    connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
-
-    // Toolbar
-    auto toolbar = addToolBar("Main");
-    toolbar->addAction(m_runAction);
-    toolbar->addAction(m_stopAction);
-    toolbar->addSeparator();
-    toolbar->addAction(newAction);
-    toolbar->addAction(openAction);
-    toolbar->addAction(m_saveAction);
-}
-
-void MainWindow::createStatusBar()
-{
+    // Status bar widgets
     m_statusLabel = new QLabel("Ready");
-    statusBar()->addWidget(m_statusLabel);
+    ui->statusbar->addWidget(m_statusLabel);
 
     m_progressBar = new QProgressBar;
     m_progressBar->setVisible(false);
     m_progressBar->setTextVisible(false);
     m_progressBar->setRange(0, 0); // Indeterminate
-    statusBar()->addPermanentWidget(m_progressBar);
+    ui->statusbar->addPermanentWidget(m_progressBar);
 
     m_elapsedLabel = new QLabel;
-    statusBar()->addPermanentWidget(m_elapsedLabel);
+    ui->statusbar->addPermanentWidget(m_elapsedLabel);
 }
 
 void MainWindow::connectSignals()
 {
+    // Menu actions
+    connect(ui->actionNew, &QAction::triggered, this, &MainWindow::onNewProject);
+    connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::onOpenProject);
+    connect(ui->actionSave, &QAction::triggered, this, &MainWindow::onSaveProject);
+    connect(ui->actionSaveAs, &QAction::triggered, this, &MainWindow::onSaveProjectAs);
+    connect(ui->actionExit, &QAction::triggered, this, &QWidget::close);
+    connect(ui->actionRun, &QAction::triggered, this, &MainWindow::onRunRequested);
+    connect(ui->actionStop, &QAction::triggered, m_processRunner, &ProcessRunner::cancel);
+    connect(ui->actionAdvancedOptions, &QAction::triggered, this, &MainWindow::onAdvancedOptionsRequested);
+    connect(ui->actionPreferences, &QAction::triggered, this, &MainWindow::onPreferences);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAbout);
+
     // Input form signals
-    connect(m_inputForm, &InputForm::runRequested,
+    connect(ui->inputForm, &InputForm::runRequested,
             this, &MainWindow::onRunRequested);
-    connect(m_inputForm, &InputForm::advancedOptionsRequested,
+    connect(ui->inputForm, &InputForm::advancedOptionsRequested,
             this, &MainWindow::onAdvancedOptionsRequested);
-    connect(m_inputForm, &InputForm::formValidityChanged,
+    connect(ui->inputForm, &InputForm::formValidityChanged,
             this, &MainWindow::onFormValidityChanged);
 
     // Process runner signals
@@ -189,7 +112,7 @@ void MainWindow::onRunRequested()
         return;
     }
 
-    OptionsData options = m_inputForm->getOptionsData();
+    OptionsData options = ui->inputForm->getOptionsData();
     if (!options.isValid())
     {
         QMessageBox::critical(this, "Invalid Options", options.validationError());
@@ -197,14 +120,14 @@ void MainWindow::onRunRequested()
     }
 
     // Clear output
-    m_outputText->clear();
+    ui->outputText->clear();
 
     // Get command line arguments
     QStringList args = options.toCommandLineArgs();
 
     // Log the command
-    m_outputText->append("Command: cudaSAXS " + args.join(" ") + "\n");
-    m_outputText->append(QString(80, '-') + "\n");
+    ui->outputText->append("Command: cudaSAXS " + args.join(" ") + "\n");
+    ui->outputText->append(QString(80, '-') + "\n");
 
     // Set working directory to the directory of the trajectory file
     QFileInfo xtcInfo(options.xtcFile);
@@ -216,7 +139,7 @@ void MainWindow::onRunRequested()
 
 void MainWindow::onAdvancedOptionsRequested()
 {
-    OptionsData currentOptions = m_inputForm->getOptionsData();
+    OptionsData currentOptions = ui->inputForm->getOptionsData();
     m_advancedDialog->setOptionsData(currentOptions);
 
     if (m_advancedDialog->exec() == QDialog::Accepted)
@@ -230,14 +153,14 @@ void MainWindow::onAdvancedOptionsRequested()
         currentOptions.sodiumAtoms = advancedOptions.sodiumAtoms;
         currentOptions.chlorineAtoms = advancedOptions.chlorineAtoms;
 
-        m_inputForm->setOptionsData(currentOptions);
+        ui->inputForm->setOptionsData(currentOptions);
     }
 }
 
 void MainWindow::onProcessStarted()
 {
-    m_runAction->setEnabled(false);
-    m_stopAction->setEnabled(true);
+    ui->actionRun->setEnabled(false);
+    ui->actionStop->setEnabled(true);
     m_progressBar->setVisible(true);
     m_statusLabel->setText("Running...");
 
@@ -249,16 +172,16 @@ void MainWindow::onProcessStarted()
 
 void MainWindow::onProcessFinished(int exitCode)
 {
-    m_runAction->setEnabled(true);
-    m_stopAction->setEnabled(false);
+    ui->actionRun->setEnabled(true);
+    ui->actionStop->setEnabled(false);
     m_progressBar->setVisible(false);
     m_elapsedTimer->stop();
 
     if (exitCode == 0)
     {
         m_statusLabel->setText("Finished successfully");
-        m_outputText->append("\n" + QString(80, '-'));
-        m_outputText->append("Process finished successfully");
+        ui->outputText->append("\n" + QString(80, '-'));
+        ui->outputText->append("Process finished successfully");
 
         QMessageBox::information(this, "Success",
                                  "SAXS calculation completed successfully!");
@@ -266,8 +189,8 @@ void MainWindow::onProcessFinished(int exitCode)
     else
     {
         m_statusLabel->setText("Finished with errors");
-        m_outputText->append("\n" + QString(80, '-'));
-        m_outputText->append(QString("Process finished with exit code: %1").arg(exitCode));
+        ui->outputText->append("\n" + QString(80, '-'));
+        ui->outputText->append(QString("Process finished with exit code: %1").arg(exitCode));
 
         QMessageBox::warning(this, "Process Failed",
                              QString("Process exited with code %1. Check the output for details.").arg(exitCode));
@@ -276,14 +199,14 @@ void MainWindow::onProcessFinished(int exitCode)
 
 void MainWindow::onProcessError(const QString &error)
 {
-    m_outputText->append("\nERROR: " + error);
+    ui->outputText->append("\nERROR: " + error);
     m_statusLabel->setText("Error occurred");
 }
 
 void MainWindow::onProcessOutput(const QString &output)
 {
     // Add output, but don't scroll if user is reading
-    auto cursor = m_outputText->textCursor();
+    auto cursor = ui->outputText->textCursor();
     cursor.movePosition(QTextCursor::End);
     cursor.insertText(output);
 }
@@ -295,7 +218,7 @@ void MainWindow::onProcessProgress(const QString &progress)
 
 void MainWindow::onFormValidityChanged(bool isValid)
 {
-    m_runAction->setEnabled(isValid && !m_processRunner->isRunning());
+    ui->actionRun->setEnabled(isValid && !m_processRunner->isRunning());
 }
 
 void MainWindow::updateElapsedTime()
@@ -326,8 +249,8 @@ void MainWindow::onNewProject()
     }
 
     m_projectFile.clear();
-    m_inputForm->resetToDefaults();
-    m_outputText->clear();
+    ui->inputForm->resetToDefaults();
+    ui->outputText->clear();
     setWindowTitle("cudaSAXS GUI");
 }
 
@@ -422,12 +345,12 @@ void MainWindow::loadProject(const QString &filename)
     data.chlorineAtoms = options["chlorineAtoms"].toInt();
     data.simulationType = options["simulationType"].toString("npt");
 
-    m_inputForm->setOptionsData(data);
+    ui->inputForm->setOptionsData(data);
 
     // Load output if present
     if (root.contains("output"))
     {
-        m_outputText->setPlainText(root["output"].toString());
+        ui->outputText->setPlainText(root["output"].toString());
     }
 
     m_projectFile = filename;
@@ -439,7 +362,7 @@ void MainWindow::saveProject(const QString &filename)
     QJsonObject root;
 
     // Save options
-    OptionsData data = m_inputForm->getOptionsData();
+    OptionsData data = ui->inputForm->getOptionsData();
     QJsonObject options;
 
     options["tprFile"] = data.tprFile;
@@ -476,7 +399,7 @@ void MainWindow::saveProject(const QString &filename)
     root["options"] = options;
 
     // Save output
-    root["output"] = m_outputText->toPlainText();
+    root["output"] = ui->outputText->toPlainText();
 
     // Write to file
     QFile file(filename);
